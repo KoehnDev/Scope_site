@@ -104,3 +104,16 @@
     document.head.appendChild(script);
   }
 })();
+
+(() => {
+  // Scope-wide usability controls: canonical project name, inline alternate header,
+  // reversible kickoff status, and manual PDF previews.
+  if (!document.querySelector('script[data-scope-site-controls]')) {
+    const script = document.createElement('script');
+    script.src = 'scope-site-controls.js?v=20260909-1';
+    script.async = false;
+    script.dataset.scopeSiteControls = 'true';
+    script.onerror = () => console.error('Scope site usability controls failed to load.');
+    document.head.appendChild(script);
+  }
+})();
