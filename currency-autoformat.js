@@ -129,3 +129,16 @@
     document.head.appendChild(script);
   }
 })();
+
+(() => {
+  // Keep archived projects hidden across cloud refreshes and stale devices until
+  // the user explicitly reimports the .koehn archive.
+  if (!document.querySelector('script[data-archive-tombstone-fix]')) {
+    const script = document.createElement('script');
+    script.src = 'archive-tombstone-fix.js?v=20260911-1';
+    script.async = false;
+    script.dataset.archiveTombstoneFix = 'true';
+    script.onerror = () => console.error('Durable archive tombstone protection failed to load.');
+    document.head.appendChild(script);
+  }
+})();
