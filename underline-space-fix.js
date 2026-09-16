@@ -2,6 +2,21 @@
   // Keep underlines continuous across spaces in all custom PDF rich-text renderers.
   // The core renderers split styled text into word/space tokens, and previously
   // skipped drawing an underline for whitespace-only tokens.
+  //
+  // Important: this patch rebuilds PDF functions from source. Any helper that a
+  // later runtime PDF patch closes over must also exist in this closure. The
+  // Kickoff Project Financials layout uses sanitizeContingencyPercent(), so keep
+  // the helper here to prevent the rebuilt Kickoff PDF function from throwing.
+  function sanitizeContingencyPercent(value) {
+    let raw = String(value ?? '').replace(/[^0-9.]/g, '');
+    if (!raw) return '';
+    const dot = raw.indexOf('.');
+    if (dot < 0) return raw.slice(0, 2);
+    let whole = raw.slice(0, dot).slice(0, 2);
+    const decimals = raw.slice(dot + 1).replace(/\./g, '').slice(0, 2);
+    if (!whole) whole = '0';
+    return `${whole}.${decimals}`;
+  }
 
   function patchPdfFunction(name) {
     let fn;
