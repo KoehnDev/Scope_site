@@ -122,7 +122,7 @@
   // Keep PDF underlines continuous through spaces in Proposal and Kickoff text.
   if (!document.querySelector('script[data-underline-space-fix]')) {
     const script = document.createElement('script');
-    script.src = 'underline-space-fix.js?v=20260910-1';
+    script.src = 'underline-space-fix.js?v=20260916-2';
     script.async = false;
     script.dataset.underlineSpaceFix = 'true';
     script.onerror = () => console.error('Continuous PDF underline fix failed to load.');
