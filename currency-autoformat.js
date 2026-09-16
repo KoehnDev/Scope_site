@@ -142,3 +142,15 @@
     document.head.appendChild(script);
   }
 })();
+
+(() => {
+  // Kickoff repairs: reliable manual PDF refresh and a bottom + Blank Division button.
+  if (!document.querySelector('script[data-kickoff-ui-repairs]')) {
+    const script = document.createElement('script');
+    script.src = 'kickoff-ui-repairs.js?v=20260916-1';
+    script.async = false;
+    script.dataset.kickoffUiRepairs = 'true';
+    script.onerror = () => console.error('Kickoff UI repairs failed to load.');
+    document.head.appendChild(script);
+  }
+})();
