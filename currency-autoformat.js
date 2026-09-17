@@ -179,3 +179,15 @@
     document.head.appendChild(script);
   }
 })();
+
+(() => {
+  // Kickoff shortcut for browsing proposal-side Internal Notes by division.
+  if (!document.querySelector('script[data-kickoff-internal-notes-reference]')) {
+    const script = document.createElement('script');
+    script.src = 'kickoff-internal-notes-reference.js?v=20260917-1';
+    script.async = false;
+    script.dataset.kickoffInternalNotesReference = 'true';
+    script.onerror = () => console.error('Kickoff Internal Notes reference shortcut failed to load.');
+    document.head.appendChild(script);
+  }
+})();
