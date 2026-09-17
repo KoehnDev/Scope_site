@@ -154,3 +154,16 @@
     document.head.appendChild(script);
   }
 })();
+
+(() => {
+  // Internal notes, issue history, revision comparison, kickoff prefill, and
+  // expanded Proposal Text references for Kickoff.
+  if (!document.querySelector('script[data-scope-workflow-tools]')) {
+    const script = document.createElement('script');
+    script.src = 'scope-workflow-tools.js?v=20260917-1';
+    script.async = false;
+    script.dataset.scopeWorkflowTools = 'true';
+    script.onerror = () => console.error('Scope workflow tools failed to load.');
+    document.head.appendChild(script);
+  }
+})();
