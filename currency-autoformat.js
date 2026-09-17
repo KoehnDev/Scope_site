@@ -167,3 +167,15 @@
     document.head.appendChild(script);
   }
 })();
+
+(() => {
+  // Proposal dashboard latest issue + selectable Internal Notes divisions.
+  if (!document.querySelector('script[data-workflow-card-notes-enhancements]')) {
+    const script = document.createElement('script');
+    script.src = 'workflow-card-notes-enhancements.js?v=20260917-1';
+    script.async = false;
+    script.dataset.workflowCardNotesEnhancements = 'true';
+    script.onerror = () => console.error('Proposal issue card / internal notes enhancements failed to load.');
+    document.head.appendChild(script);
+  }
+})();
