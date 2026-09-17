@@ -196,7 +196,7 @@
   // Make Revision Comparison show the exact changed wording at a glance.
   if (!document.querySelector('script[data-revision-highlight-enhancement]')) {
     const script = document.createElement('script');
-    script.src = 'revision-highlight-enhancement.js?v=20260917-1';
+    script.src = 'revision-highlight-enhancement.js?v=20260917-2';
     script.async = false;
     script.dataset.revisionHighlightEnhancement = 'true';
     script.onerror = () => console.error('Revision comparison highlighting failed to load.');
