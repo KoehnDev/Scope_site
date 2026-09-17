@@ -203,3 +203,15 @@
     document.head.appendChild(script);
   }
 })();
+
+(() => {
+  // Keep both revision columns synchronized so corresponding scope lines stay level.
+  if (!document.querySelector('script[data-revision-row-alignment]')) {
+    const script = document.createElement('script');
+    script.src = 'revision-row-alignment.js?v=20260917-1';
+    script.async = false;
+    script.dataset.revisionRowAlignment = 'true';
+    script.onerror = () => console.error('Revision comparison row alignment failed to load.');
+    document.head.appendChild(script);
+  }
+})();
