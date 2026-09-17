@@ -1,6 +1,6 @@
 (() => {
-  // Make Proposal Revision Comparison visual-first: unchanged text stays quiet,
-  // while the exact changed wording is bold and highlighted.
+  // Make Proposal Revision Comparison visual-first: preserve the proposal's
+  // original line/paragraph breaks and bold the exact changed wording.
   if (typeof document === 'undefined') return;
 
   const esc = (value = '') => String(value).replace(/[&<>"']/g, ch => ({
@@ -39,8 +39,9 @@
     #revisionResults .revision-diff-text{
       white-space:normal;overflow-wrap:anywhere;color:#30353a;font:400 12px/1.48 Inter,Arial,sans-serif
     }
-    #revisionResults .revision-diff-line{min-height:1.48em;white-space:pre-wrap}
-    #revisionResults .revision-diff-line+.revision-diff-line{margin-top:1px}
+    #revisionResults .revision-diff-line{display:block;min-height:1.48em;white-space:pre-wrap}
+    #revisionResults .revision-diff-line+.revision-diff-line{margin-top:5px}
+    #revisionResults .revision-diff-line.is-blank{min-height:.8em;margin-top:0}
     #revisionResults .revision-diff-change{
       font-weight:800;border-radius:3px;padding:1px 2px;margin:0 -1px
     }
@@ -50,6 +51,105 @@
     @media(max-width:700px){#revisionResults .revision-cols{grid-template-columns:1fr}}
   `;
   document.head.appendChild(style);
+
+  function richTextWithBreaks(richHtml = '', fallbackText = '') {
+    const html = String(richHtml || '').trim();
+    if (!html) return String(fallbackText || '').replace(/\r/g, '').trim();
+
+    const root = document.createElement('div');
+    root.innerHTML = html;
+    let out = '';
+    const blockTags = new Set(['DIV', 'P', 'LI', 'SECTION', 'ARTICLE', 'BLOCKQUOTE']);
+
+    const walk = node => {
+      if (node.nodeType === Node.TEXT_NODE) {
+        out += node.nodeValue || '';
+        return;
+      }
+      if (node.nodeType !== Node.ELEMENT_NODE) return;
+      if (node.tagName === 'BR') {
+        out += '\n';
+        return;
+      }
+      [...node.childNodes].forEach(walk);
+      if (blockTags.has(node.tagName) && out && !out.endsWith('\n')) out += '\n';
+    };
+
+    [...root.childNodes].forEach(walk);
+    return out
+      .replace(/\u00a0/g, ' ')
+      .replace(/\r/g, '')
+      .replace(/[ \t]+\n/g, '\n')
+      .replace(/\n[ \t]+/g, '\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+  }
+
+  const divisionTitle = (project, number) => {
+    const custom = String(project?.divisions?.[number]?.title || '').trim();
+    if (custom) return custom;
+    const row = (typeof CSI_DIVISIONS !== 'undefined' ? CSI_DIVISIONS : []).find(([n]) => String(n) === String(number));
+    return row?.[1] || '';
+  };
+
+  function currentComparisonChanges() {
+    if (typeof getCurrentProject !== 'function') return new Map();
+    const savedCurrent = getCurrentProject();
+    if (!savedCurrent) return new Map();
+    let current = savedCurrent;
+    try {
+      if (!savedCurrent.locked && !savedCurrent.deletedByUser && typeof collectEditorProject === 'function') current = collectEditorProject() || savedCurrent;
+    } catch {}
+
+    const owner = current.ownerUsername || state?.currentProjectOwner || state?.user?.username || '';
+    const familyId = current.familyId || current.id;
+    const versions = typeof familyProjects === 'function'
+      ? familyProjects(owner, familyId, { includeDeleted: true })
+      : [current];
+    const selectedId = document.getElementById('revisionCompare')?.value || '';
+    const base = versions.find(project => project.id === selectedId);
+    if (!base) return new Map();
+
+    const result = [];
+    const add = (label, before, after) => {
+      before = String(before ?? '').trim();
+      after = String(after ?? '').trim();
+      if (before !== after) result.push({ label, before: before || '—', after: after || '—' });
+    };
+
+    [
+      ['Project Name', 'projectName'],
+      ['Project Number', 'projectNumber'],
+      ['Client / Owner', 'clientName'],
+      ['Attention', 'attention'],
+      ['Project Address', 'projectAddress'],
+      ['Intro / Proposal Note', 'introNote']
+    ].forEach(([label, key]) => add(label, base?.[key], current?.[key]));
+
+    (typeof CSI_DIVISIONS !== 'undefined' ? CSI_DIVISIONS : []).forEach(([number]) => {
+      const beforeDivision = base?.divisions?.[number] || {};
+      const afterDivision = current?.divisions?.[number] || {};
+      const beforeText = `${beforeDivision.enabled ? 'Included' : 'Not included'}\n${richTextWithBreaks(beforeDivision.richText, beforeDivision.text)}`.trim();
+      const afterText = `${afterDivision.enabled ? 'Included' : 'Not included'}\n${richTextWithBreaks(afterDivision.richText, afterDivision.text)}`.trim();
+      add(`Division ${number} - ${divisionTitle(current, number) || divisionTitle(base, number)}`, beforeText, afterText);
+    });
+
+    add('Clarifications', richTextWithBreaks(base?.clarificationsRichText, base?.clarifications), richTextWithBreaks(current?.clarificationsRichText, current?.clarifications));
+    add('Exclusions', richTextWithBreaks(base?.exclusionsRichText, base?.exclusions), richTextWithBreaks(current?.exclusionsRichText, current?.exclusions));
+
+    const alternateText = project => (project?.alternateScopes || [])
+      .filter(item => item?.enabled !== false)
+      .map((item, index) => `${item.title || `Alternate ${index + 1}`}\n${richTextWithBreaks(item.richText, item.text)}`.trim())
+      .join('\n\n');
+    add('Alternates', alternateText(base), alternateText(current));
+
+    const pricingText = project => (project?.priceItems || [])
+      .map(item => `${item.name || ''}${item.description ? ` - ${item.description}` : ''}: ${item.price || ''}`)
+      .join('\n');
+    add('Pricing', pricingText(base), pricingText(current));
+
+    return new Map(result.map(change => [change.label, change]));
+  }
 
   function wordChangePair(beforeLine, afterLine) {
     const a = String(beforeLine ?? '').match(/\s+|[^\s]+/g) || [];
@@ -77,7 +177,6 @@
     const b = String(after ?? '').split('\n');
     const n = a.length, m = b.length;
     if (n * m > 40000) {
-      // Large scopes: keep processing linear and still make the changed block obvious.
       let start = 0;
       while (start < n && start < m && a[start] === b[start]) start++;
       let ai = n - 1, bi = m - 1;
@@ -114,7 +213,7 @@
     const afterLines = [];
     let i = 0;
 
-    const normalLine = text => `<div class="revision-diff-line">${text === '' ? '<br>' : esc(text)}</div>`;
+    const normalLine = text => `<div class="revision-diff-line${text === '' ? ' is-blank' : ''}">${text === '' ? '&nbsp;' : esc(text)}</div>`;
     const changedLine = html => `<div class="revision-diff-line"><strong class="revision-diff-change">${html || '&nbsp;'}</strong></div>`;
 
     while (i < ops.length) {
@@ -155,6 +254,7 @@
     if (!root) return;
     const list = root.querySelector('.revision-list');
     if (!list) return;
+    const exactChanges = currentComparisonChanges();
 
     if (!root.querySelector('.revision-compare-legend')) {
       const legend = document.createElement('div');
@@ -170,8 +270,13 @@
       const beforePre = cols[0].querySelector('pre');
       const afterPre = cols[1].querySelector('pre');
       if (!beforePre || !afterPre) return;
+      const summary = row.querySelector('summary');
+      const label = String(summary?.textContent || '').trim();
+      const exact = exactChanges.get(label);
+      const beforeText = exact?.before ?? beforePre.textContent ?? '';
+      const afterText = exact?.after ?? afterPre.textContent ?? '';
 
-      const rendered = renderPair(beforePre.textContent || '', afterPre.textContent || '');
+      const rendered = renderPair(beforeText, afterText);
       const beforeBox = document.createElement('div');
       beforeBox.className = 'revision-diff-text revision-diff-before';
       beforeBox.innerHTML = rendered.before;
@@ -181,7 +286,6 @@
       beforePre.replaceWith(beforeBox);
       afterPre.replaceWith(afterBox);
 
-      const summary = row.querySelector('summary');
       if (summary && !summary.querySelector('.revision-change-badge')) {
         const badge = document.createElement('span');
         badge.className = 'revision-change-badge';
