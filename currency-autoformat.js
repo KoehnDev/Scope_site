@@ -155,3 +155,15 @@
     document.head.appendChild(script);
   }
 })();
+
+(() => {
+  // Drag-and-drop ordering for Kickoff divisions and quote PDFs.
+  if (!document.querySelector('script[data-kickoff-drag-page-order]')) {
+    const script = document.createElement('script');
+    script.src = 'kickoff-drag-page-order.js?v=20260917-1';
+    script.async = false;
+    script.dataset.kickoffDragPageOrder = 'true';
+    script.onerror = () => console.error('Kickoff drag-and-drop page ordering failed to load.');
+    document.head.appendChild(script);
+  }
+})();
