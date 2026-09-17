@@ -5,8 +5,13 @@
 
   const style = document.createElement('style');
   style.textContent = `
-    .kickoff-page-order-row[data-kickoff-page-token]{position:relative}
-    .kickoff-page-drag-handle{display:inline-flex;align-items:center;justify-content:center;width:28px;height:32px;margin-right:2px;border:0;background:transparent;color:#8a8f93;font-size:17px;line-height:1;cursor:grab;user-select:none;touch-action:none;border-radius:6px;flex:0 0 auto}
+    /* Keep the original compact page-order layout; movable rows simply gain
+       one narrow drag-handle column. */
+    .kickoff-page-order-row[data-kickoff-page-token]{position:relative;grid-template-columns:24px 34px minmax(0,1fr) auto!important;align-items:center!important;gap:8px!important;padding:8px 10px!important;min-height:0!important}
+    .kickoff-page-order-row.fixed{grid-template-columns:34px minmax(0,1fr) auto!important;padding:8px 10px!important;min-height:0!important}
+    .kickoff-page-order-row[data-kickoff-page-token] .kickoff-page-order-index{width:26px;height:26px}
+    .kickoff-page-order-row[data-kickoff-page-token] .kickoff-page-order-actions .btn-small{min-width:30px;min-height:28px;padding:4px 7px}
+    .kickoff-page-drag-handle{display:inline-flex!important;align-items:center;justify-content:center;width:22px;height:28px;margin:0!important;border:0;background:transparent;color:#8a8f93;font-size:15px!important;line-height:1!important;cursor:grab;user-select:none;touch-action:none;border-radius:5px;flex:0 0 auto}
     .kickoff-page-drag-handle:hover{background:#f1f3f4;color:#555b60}
     .kickoff-page-drag-handle:active{cursor:grabbing}
     .kickoff-page-order-row.kickoff-dragging{opacity:.45}
@@ -15,6 +20,12 @@
     .kickoff-page-order-row.kickoff-drop-after::after{bottom:-3px}
     .kickoff-page-order-drag-note{display:flex;align-items:center;gap:6px;margin:0 0 8px;color:#777d81;font-size:10px}
     .kickoff-page-order-drag-note strong{color:#555b60}
+    @media (max-width:700px){
+      .kickoff-page-order-row[data-kickoff-page-token]{grid-template-columns:24px 34px minmax(0,1fr)!important;align-items:start!important}
+      .kickoff-page-order-row[data-kickoff-page-token] .kickoff-page-order-actions{grid-column:3!important;justify-self:start}
+      .kickoff-page-order-row.fixed{grid-template-columns:34px minmax(0,1fr)!important}
+      .kickoff-page-order-row.fixed .kickoff-page-order-fixed{grid-column:2!important;justify-self:start}
+    }
   `;
   document.head.appendChild(style);
 
@@ -116,8 +127,6 @@
         if (targetIndex < 0) return;
         if (after) targetIndex += 1;
         order.splice(targetIndex,0,sourceToken);
-        // Match the existing arrow behavior: change page order without altering
-        // the quote's assigned division metadata.
         applyKickoffPageOrder(k,order,{reassociateQuotes:false});
       });
 
@@ -146,7 +155,6 @@
     window.renderKickoffPageOrder = wrappedRender;
   }
 
-  // Extra safety for opening the Documents tab after startup.
   document.addEventListener('click', event => {
     if (event.target?.closest?.('[data-kickoff-tab="documents"],[data-kickoff-page-up],[data-kickoff-page-down]')) {
       requestAnimationFrame(enhanceKickoffPageOrderDrag);
