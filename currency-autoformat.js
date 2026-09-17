@@ -84,8 +84,6 @@
     input.value = next;
     refreshTotalsFor(input);
 
-    // Existing proposal/kickoff listeners save on input, so dispatch one after the
-    // final formatted value is written to ensure the formatted amount is persisted.
     input.dispatchEvent(new Event('input', { bubbles: true }));
   });
 
@@ -93,8 +91,6 @@
 })();
 
 (() => {
-  // Proposal-only controls: custom alternate section title, long-title wrapping,
-  // and optional Base Bid display for unit-price proposals.
   if (!document.querySelector('script[data-proposal-alternate-controls]')) {
     const script = document.createElement('script');
     script.src = 'proposal-alternate-controls.js?v=20260904-2';
@@ -106,8 +102,6 @@
 })();
 
 (() => {
-  // Scope-wide usability controls: canonical project name, inline alternate header,
-  // reversible kickoff status, and manual PDF previews.
   if (!document.querySelector('script[data-scope-site-controls]')) {
     const script = document.createElement('script');
     script.src = 'scope-site-controls.js?v=20260909-1';
@@ -119,7 +113,6 @@
 })();
 
 (() => {
-  // Keep PDF underlines continuous through spaces in Proposal and Kickoff text.
   if (!document.querySelector('script[data-underline-space-fix]')) {
     const script = document.createElement('script');
     script.src = 'underline-space-fix.js?v=20260916-2';
@@ -131,8 +124,6 @@
 })();
 
 (() => {
-  // Keep archived projects hidden across cloud refreshes and stale devices until
-  // the user explicitly reimports the .koehn archive.
   if (!document.querySelector('script[data-archive-tombstone-fix]')) {
     const script = document.createElement('script');
     script.src = 'archive-tombstone-fix.js?v=20260911-1';
@@ -144,26 +135,12 @@
 })();
 
 (() => {
-  // Kickoff repairs: reliable manual PDF refresh and a bottom + Blank Division button.
   if (!document.querySelector('script[data-kickoff-ui-repairs]')) {
     const script = document.createElement('script');
     script.src = 'kickoff-ui-repairs.js?v=20260916-1';
     script.async = false;
     script.dataset.kickoffUiRepairs = 'true';
     script.onerror = () => console.error('Kickoff UI repairs failed to load.');
-    document.head.appendChild(script);
-  }
-})();
-
-(() => {
-  // Internal notes, issue history, revision comparison, kickoff prefill, and
-  // expanded Proposal Text references for Kickoff.
-  if (!document.querySelector('script[data-scope-workflow-tools]')) {
-    const script = document.createElement('script');
-    script.src = 'scope-workflow-tools.js?v=20260917-1';
-    script.async = false;
-    script.dataset.scopeWorkflowTools = 'true';
-    script.onerror = () => console.error('Scope workflow tools failed to load.');
     document.head.appendChild(script);
   }
 })();
