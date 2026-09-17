@@ -83,7 +83,6 @@
     if (next === input.value) return;
     input.value = next;
     refreshTotalsFor(input);
-
     input.dispatchEvent(new Event('input', { bubbles: true }));
   });
 
@@ -141,6 +140,18 @@
     script.async = false;
     script.dataset.kickoffUiRepairs = 'true';
     script.onerror = () => console.error('Kickoff UI repairs failed to load.');
+    document.head.appendChild(script);
+  }
+})();
+
+(() => {
+  // Safe workflow tools: no MutationObserver loop on Kickoff.
+  if (!document.querySelector('script[data-scope-workflow-safe]')) {
+    const script = document.createElement('script');
+    script.src = 'scope-workflow-tools-safe.js?v=20260917-2';
+    script.async = false;
+    script.dataset.scopeWorkflowSafe = 'true';
+    script.onerror = () => console.error('Safe scope workflow tools failed to load.');
     document.head.appendChild(script);
   }
 })();
