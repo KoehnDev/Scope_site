@@ -68,7 +68,7 @@
   // Load currency auto-formatting for proposal and kickoff monetary fields.
   if (!document.querySelector('script[data-currency-autoformat]')) {
     const script = document.createElement('script');
-    script.src = 'currency-autoformat.js?v=20260831-1';
+    script.src = 'currency-autoformat.js?v=20260921-2';
     script.async = false;
     script.dataset.currencyAutoformat = 'true';
     script.onerror = () => console.error('Currency auto-formatting failed to load.');
