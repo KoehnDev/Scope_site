@@ -215,3 +215,16 @@
     document.head.appendChild(script);
   }
 })();
+
+
+(() => {
+  // Use stronger lossless PNG compression only for downloaded Proposal PDFs.
+  if (!document.querySelector('script[data-pdf-lossless-size-optimization]')) {
+    const script = document.createElement('script');
+    script.src = 'pdf-lossless-size-optimization.js?v=20260921-1';
+    script.async = false;
+    script.dataset.pdfLosslessSizeOptimization = 'true';
+    script.onerror = () => console.error('Proposal PDF lossless size optimization failed to load.');
+    document.head.appendChild(script);
+  }
+})();
