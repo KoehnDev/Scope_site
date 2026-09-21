@@ -218,10 +218,10 @@
 
 
 (() => {
-  // Use stronger lossless PNG compression only for downloaded Proposal PDFs.
+  // Reduce downloaded Proposal PDF size while preserving full-resolution artwork.
   if (!document.querySelector('script[data-pdf-lossless-size-optimization]')) {
     const script = document.createElement('script');
-    script.src = 'pdf-lossless-size-optimization.js?v=20260921-1';
+    script.src = 'pdf-lossless-size-optimization.js?v=20260921-2';
     script.async = false;
     script.dataset.pdfLosslessSizeOptimization = 'true';
     script.onerror = () => console.error('Proposal PDF lossless size optimization failed to load.');
