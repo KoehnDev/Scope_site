@@ -2435,37 +2435,6 @@ async function imageToDataUrl(src) {
   imageDataUrlCache.set(key,promise);
   try{return await promise;}catch(err){imageDataUrlCache.delete(key);throw err;}
 }
-
-// Re-encode oversized full-page template artwork specifically for PDF output.
-// 300 DPI is the maximum useful resolution for letter-size office/print output;
-// the original PNG assets remain untouched for the website.
-const pdfTemplateImageCache=new Map();
-async function imageToPdfTemplateDataUrl(src,{pageWidthIn=8.5,pageHeightIn=11,dpi=300,quality=.96}={}){
-  const key=`${String(src||'')}:${Number(pageWidthIn).toFixed(3)}:${Number(pageHeightIn).toFixed(3)}:${dpi}:${quality}`;
-  if(pdfTemplateImageCache.has(key))return pdfTemplateImageCache.get(key);
-  const promise=new Promise((resolve,reject)=>{
-    const img=new Image();img.crossOrigin="anonymous";
-    img.onload=()=>{
-      try{
-        const maxW=Math.max(1,Math.round(Number(pageWidthIn||8.5)*dpi));
-        const maxH=Math.max(1,Math.round(Number(pageHeightIn||11)*dpi));
-        const iw=Math.max(1,img.naturalWidth||img.width||1),ih=Math.max(1,img.naturalHeight||img.height||1);
-        const scale=Math.min(1,maxW/iw,maxH/ih);
-        const w=Math.max(1,Math.round(iw*scale)),h=Math.max(1,Math.round(ih*scale));
-        const canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;
-        const ctx=canvas.getContext('2d',{alpha:false});
-        ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h);
-        ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
-        ctx.drawImage(img,0,0,w,h);
-        resolve(canvas.toDataURL('image/jpeg',quality));
-      }catch(err){reject(err);}
-    };
-    img.onerror=reject;img.src=String(src||'');
-  });
-  pdfTemplateImageCache.set(key,promise);
-  try{return await promise;}catch(err){pdfTemplateImageCache.delete(key);throw err;}
-}
-
 async function cropMapDataUrlToAspect(dataUrl,targetAspect){
   const aspect=Math.max(.25,Number(targetAspect)||1);
   const cacheKey=`${dataUrl.length}:${dataUrl.slice(-80)}:${aspect.toFixed(4)}`;
@@ -2826,8 +2795,8 @@ async function exportPdf(options={}) {
       : ['assets/marketing/marketing-cover-revision.png','assets/marketing/marketing-cover-original.png'];
   try {
     [coverRevisionData,coverOriginalData,interiorData]=await Promise.all([
-      imageToPdfTemplateDataUrl(coverPaths[0],{pageWidthIn:pageW,pageHeightIn:coverPageH,dpi:300,quality:.96}),
-      imageToPdfTemplateDataUrl(coverPaths[1],{pageWidthIn:pageW,pageHeightIn:coverPageH,dpi:300,quality:.96}),
+      imageToDataUrl(coverPaths[0]),
+      imageToDataUrl(coverPaths[1]),
       imageToDataUrl('assets/marketing/marketing-blank.png')
     ]);
   } catch {}
@@ -2840,7 +2809,7 @@ async function exportPdf(options={}) {
   function coverMask(x,y,w,h,color=[255,255,255]){doc.setFillColor(...color);doc.rect(x,y,w,h,'F');}
   function drawCover(){
     const coverData=rev?coverRevisionData:coverOriginalData;
-    if(coverData) doc.addImage(coverData,'JPEG',0,0,pageW,coverPageH,rev?'proposal-cover-revision':'proposal-cover-original','FAST');
+    if(coverData) doc.addImage(coverData,'PNG',0,0,pageW,coverPageH,undefined,'FAST');
     else { setFill([255,255,255]);doc.rect(0,0,pageW,pageH,'F'); }
     const coverOffice={...getOfficeContact(p.estimatingOffice||"fredonia"),...(p.officeContact||{})};
     const livePhone=coverOffice.phone||"";
@@ -2893,7 +2862,7 @@ async function exportPdf(options={}) {
     drawCentered(website,fields.website,{bold:false,fontSize:12.0,maxLines:1,align:coverAlign});
   }
   function drawBackground(){
-    if(interiorData)doc.addImage(interiorData,'PNG',0,0,pageW,pageH,'proposal-interior-background','FAST');
+    if(interiorData)doc.addImage(interiorData,'PNG',0,0,pageW,pageH,undefined,'FAST');
     else {setFill([255,255,255]);doc.rect(0,0,pageW,pageH,'F');}
   }
   function drawInteriorHeader(pageNum,totalPages){
