@@ -36,6 +36,16 @@
     contingencyLabel.insertAdjacentElement('afterend', permitLabel);
   }
 
+  const taxLabel = document.querySelector('[data-kickoff-info="taxStatus"]')?.closest('label');
+  const contingencyLabel = document.querySelector('.kickoff-contingency-field');
+  if (taxLabel && contingencyLabel) taxLabel.insertAdjacentElement('afterend', contingencyLabel);
+  if (contingencyLabel && !document.querySelector('[data-kickoff-info="contractRequirements"]')) {
+    const requirementsLabel = document.createElement('label');
+    requirementsLabel.className = 'full kickoff-contract-requirements-field';
+    requirementsLabel.innerHTML = 'Liqudated damages, wage requirements, BABA, Allowances<textarea data-kickoff-info="contractRequirements" rows="4" placeholder="Enter liquidated damages, wage requirements, BABA requirements, and allowances."></textarea>';
+    contingencyLabel.insertAdjacentElement('afterend', requirementsLabel);
+  }
+
   const style = document.createElement('style');
   style.textContent = `
     .kickoff-financial-block{border:1px solid #d9dde1;border-radius:10px;background:#f8f9fa;padding:13px 14px 14px}
@@ -44,7 +54,7 @@
     .kickoff-financial-grid label{min-width:0}
     .kickoff-gross-profit{background:#f1f2f3;font-weight:700;color:#45494d}
     .kickoff-contingency-field input{max-width:76px;justify-self:start;text-align:right}
-    .kickoff-permitting-field textarea{min-height:104px}
+    .kickoff-permitting-field textarea,.kickoff-contract-requirements-field textarea{min-height:104px}
     @media (max-width:760px){.kickoff-financial-grid{grid-template-columns:1fr}}
   `;
   document.head.appendChild(style);
@@ -54,6 +64,8 @@
   const grossProfitInput = document.querySelector('[data-kickoff-info="grossProfit"]');
   const contingencyInput = document.querySelector('[data-kickoff-info="contingencyPercent"]');
   const permittingInput = document.querySelector('[data-kickoff-info="permittingInspectionsTesting"]');
+
+  const requirementsInput = document.querySelector('[data-kickoff-info="contractRequirements"]');
 
   function moneyValue(value) {
     const raw = String(value ?? '').trim();
@@ -139,16 +151,17 @@
     });
   }
 
-  if (permittingInput && permittingInput.dataset.kickoffExtraWired !== 'true') {
-    permittingInput.dataset.kickoffExtraWired = 'true';
-    permittingInput.addEventListener('input', () => {
+  [permittingInput, requirementsInput].filter(Boolean).forEach(input => {
+    if (input.dataset.kickoffExtraWired === 'true') return;
+    input.dataset.kickoffExtraWired = 'true';
+    input.addEventListener('input', () => {
       if (typeof scheduleKickoffSave === 'function') scheduleKickoffSave();
     });
-    permittingInput.addEventListener('change', () => {
+    input.addEventListener('change', () => {
       if (typeof saveKickoffInfoFromForm === 'function') saveKickoffInfoFromForm();
       if (typeof scheduleKickoffPdfPreview === 'function') scheduleKickoffPdfPreview(120);
     });
-  }
+  });
 
   function hydrateKickoffFinancialFields(project) {
     const info = project?.kickoff?.projectInfo || {};
@@ -157,6 +170,7 @@
     if (grossProfitInput) grossProfitInput.value = info.grossProfit || '';
     if (contingencyInput) contingencyInput.value = sanitizeContingencyPercent(info.contingencyPercent).replace(/\.$/, '');
     if (permittingInput) permittingInput.value = info.permittingInspectionsTesting || '';
+    if (requirementsInput) requirementsInput.value = info.contractRequirements || '';
     recalcGrossProfit();
   }
 
