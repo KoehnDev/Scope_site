@@ -32,7 +32,7 @@
 
     const permitLabel = document.createElement('label');
     permitLabel.className = 'full kickoff-permitting-field';
-    permitLabel.innerHTML = 'Permitting, Inspections &amp; Testing<textarea data-kickoff-info="permittingInspectionsTesting" rows="4" placeholder="Enter permitting requirements, inspections, testing, fees, responsibilities, or other related notes."></textarea>';
+    permitLabel.innerHTML = 'Permitting, Permit Entity, Inspections &amp; Testing<textarea data-kickoff-info="permittingInspectionsTesting" rows="4" placeholder="Enter permitting requirements, inspections, testing, fees, responsibilities, or other related notes."></textarea>';
     contingencyLabel.insertAdjacentElement('afterend', permitLabel);
   }
 
@@ -42,7 +42,7 @@
   if (contingencyLabel && !document.querySelector('[data-kickoff-info="contractRequirements"]')) {
     const requirementsLabel = document.createElement('label');
     requirementsLabel.className = 'full kickoff-contract-requirements-field';
-    requirementsLabel.innerHTML = 'Liqudated damages, wage requirements, BABA, Allowances<textarea data-kickoff-info="contractRequirements" rows="4" placeholder="Enter liquidated damages, wage requirements, BABA requirements, and allowances."></textarea>';
+    requirementsLabel.innerHTML = 'Liquidated Damages, Wage Requirements, BABA &amp; Allowances<textarea data-kickoff-info="contractRequirements" rows="4" placeholder="Enter liquidated damages, wage requirements, BABA requirements, and allowances."></textarea>';
     contingencyLabel.insertAdjacentElement('afterend', requirementsLabel);
   }
 
@@ -240,7 +240,7 @@
 
   replaceOnce(
     "  y=drawSection(y,'Owner Contacts',info.ownerContacts||'');",
-    "  if(String(info.permittingInspectionsTesting||'').trim())y=drawSection(y,'Permitting, Inspections & Testing',info.permittingInspectionsTesting||'');\n  y=drawSection(y,'Owner Contacts',info.ownerContacts||'');",
+    "  if(String(info.permittingInspectionsTesting||'').trim())y=drawSection(y,'Permitting, Permit Entity, Inspections & Testing',info.permittingInspectionsTesting||'');\n  y=drawSection(y,'Owner Contacts',info.ownerContacts||'');",
     'permitting section placement'
   );
 

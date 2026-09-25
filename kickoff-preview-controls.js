@@ -192,7 +192,7 @@
   // Load the additional Kickoff-only Project Information fields.
   if (!document.querySelector('script[data-kickoff-project-info-fields]')) {
     const script = document.createElement('script');
-    script.src = 'kickoff-project-info-fields.js?v=20260925-1';
+    script.src = 'kickoff-project-info-fields.js?v=20260925-2';
     script.async = false;
     script.dataset.kickoffProjectInfoFields = 'true';
     script.onerror = () => console.error('Kickoff project information fields failed to load.');
@@ -204,7 +204,7 @@
   // Compact the Kickoff financial summary after the Project Information fields load.
   if (!document.querySelector('script[data-kickoff-financial-pdf-layout]')) {
     const script = document.createElement('script');
-    script.src = 'kickoff-financial-pdf-layout.js?v=20260925-1';
+    script.src = 'kickoff-financial-pdf-layout.js?v=20260925-2';
     script.async = false;
     script.dataset.kickoffFinancialPdfLayout = 'true';
     script.onerror = () => console.error('Kickoff financial PDF layout failed to load.');

@@ -74,7 +74,7 @@
     const grossProfitValue = "String(info.projectCost||'').trim()?formatMoneyNumber(moneyNumber(info.revenue||info.contractValue||'')-moneyNumber(info.projectCost||'')):(info.grossProfit||'')";
     const summaryReplacement =
       "  y=drawTwoColumnRows(y,[[['Owner / Client',info.owner||p.clientName],['Contract Type',info.contractType]],[['Tax Status',info.taxStatus],['Contingency %'," + contingencyValue + "]]]);\n" +
-      "  if(String(info.contractRequirements||'').trim())y=drawSection(y,'Liqudated damages, wage requirements, BABA, Allowances',info.contractRequirements);\n" +
+      "  if(String(info.contractRequirements||'').trim())y=drawSection(y,'Liquidated Damages, Wage Requirements, BABA & Allowances',info.contractRequirements);\n" +
       "  y=drawProjectFinancialsBox(y,[['Revenue',info.revenue||info.contractValue||''],['Project Cost',info.projectCost||''],['Gross Profit'," + grossProfitValue + "]]);\n" +
       "  y=drawTwoColumnRows(y,[[['Start Date',info.startDate?fmtDate(info.startDate):'—'],['End Date',info.endDate?fmtDate(info.endDate):'—']]]);\n";
 
