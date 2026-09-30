@@ -551,7 +551,7 @@ function normalizeProject(p, ownerUsername="") {
   p.acceptedAt = p.acceptedAt || null;
   p.kickoff = {...(p.kickoff||{})};
   p.kickoff.quotes = Array.isArray(p.kickoff.quotes) ? p.kickoff.quotes.map(q=>({...q,pages:Array.isArray(q.pages)?q.pages:[],divisionId:q.divisionId||null})) : [];
-  p.kickoff.divisions = Array.isArray(p.kickoff.divisions) ? p.kickoff.divisions.map(d=>({id:d.id||uid(),number:String(d.number||""),description:String(d.description||""),subcontractor:String(d.subcontractor||""),budget:String(d.budget||""),notesHtml:sanitizeScopeHtml(d.notesHtml||plainTextToRichHtml(d.notes||"")),sourceDivisionNumber:d.sourceDivisionNumber||"",proposalReferenceNumber:d.proposalReferenceNumber||d.sourceDivisionNumber||""})) : [];
+  p.kickoff.divisions = Array.isArray(p.kickoff.divisions) ? p.kickoff.divisions.map(d=>({id:d.id||uid(),number:String(d.number||""),description:String(d.description||""),subcontractor:String(d.subcontractor||""),contactName:String(d.contactName||""),phone:String(d.phone||""),email:String(d.email||""),budget:String(d.budget||""),notesHtml:sanitizeScopeHtml(d.notesHtml||plainTextToRichHtml(d.notes||"")),sourceDivisionNumber:d.sourceDivisionNumber||"",proposalReferenceNumber:d.proposalReferenceNumber||d.sourceDivisionNumber||""})) : [];
   p.kickoff.pageOrder = Array.isArray(p.kickoff.pageOrder) ? p.kickoff.pageOrder.map(String) : [];
   p.kickoff.projectInfo = {...(p.kickoff.projectInfo||{})};
   p.kickoff.projectInfo.maps = {enabled:false,wide:true,close:true,street:false,wideZoom:12,closeZoom:17,streetHeading:0,streetPitch:0,streetFov:90,wideSnapshot:"",closeSnapshot:"",streetSnapshot:"",...(p.kickoff.projectInfo.maps||{})};
@@ -1582,7 +1582,7 @@ function moveKickoffPageToken(token,delta){
 
 function addKickoffDivision(sourceNumber=""){
   const p=getCurrentKickoffProject(); if(!p)return;
-  let division={id:uid(),number:"",description:"",subcontractor:"",budget:"",notesHtml:"",sourceDivisionNumber:"",proposalReferenceNumber:""};
+  let division={id:uid(),number:"",description:"",subcontractor:"",contactName:"",phone:"",email:"",budget:"",notesHtml:"",sourceDivisionNumber:"",proposalReferenceNumber:""};
   if(sourceNumber&&p.divisions?.[sourceNumber]){
     const source=p.divisions[sourceNumber];
     division={...division,number:sourceNumber,description:source.title||"",budget:proposalDivisionBudget(p,sourceNumber),notesHtml:normalizedDivisionRichHtml(source),sourceDivisionNumber:sourceNumber,proposalReferenceNumber:sourceNumber};
@@ -1598,7 +1598,7 @@ function collectKickoffDivisionsFromDom(){
     const id=card.dataset.kickoffDivisionId, old=existing.get(id)||{};
     const get=f=>card.querySelector(`[data-kickoff-division-field="${f}"]`)?.value||"";
     const editor=card.querySelector('.kickoff-rich-editor');
-    return {id,number:get('number'),description:get('description'),subcontractor:get('subcontractor'),budget:get('budget'),notesHtml:sanitizeScopeHtml(editor?.innerHTML||""),sourceDivisionNumber:old.sourceDivisionNumber||"",proposalReferenceNumber:card.dataset.kickoffProposalReference||old.proposalReferenceNumber||old.sourceDivisionNumber||""};
+    return {id,number:get('number'),description:get('description'),subcontractor:get('subcontractor'),contactName:get('contactName'),phone:get('phone'),email:get('email'),budget:get('budget'),notesHtml:sanitizeScopeHtml(editor?.innerHTML||""),sourceDivisionNumber:old.sourceDivisionNumber||"",proposalReferenceNumber:card.dataset.kickoffProposalReference||old.proposalReferenceNumber||old.sourceDivisionNumber||""};
   });
   mutateKickoff(k=>k.divisions=divisions);
   renderKickoffPageOrder();
@@ -1638,6 +1638,11 @@ function renderKickoffDivisions(){
       <label>Subcontractor<input data-kickoff-division-field="subcontractor" value="${esc(d.subcontractor)}" placeholder="Subcontractor / vendor" /></label>
       <label>Budget<input data-kickoff-division-field="budget" value="${esc(d.budget)}" placeholder="$0.00" /></label>
       <div class="kickoff-division-actions"><button class="btn btn-secondary btn-small" data-kickoff-move-up="${esc(d.id)}" type="button" ${index===0?'disabled':''}>↑</button><button class="btn btn-secondary btn-small" data-kickoff-move-down="${esc(d.id)}" type="button" ${index===divisions.length-1?'disabled':''}>↓</button><button class="btn btn-danger btn-small" data-kickoff-remove-division="${esc(d.id)}" type="button">×</button></div>
+    </div>
+    <div class="kickoff-division-contact-row">
+      <label>Contact Name:<input data-kickoff-division-field="contactName" value="${esc(d.contactName||'')}" placeholder="Contact name" /></label>
+      <label>Phone:<input type="tel" data-kickoff-division-field="phone" value="${esc(d.phone||'')}" placeholder="Phone number" /></label>
+      <label>Email:<input type="email" data-kickoff-division-field="email" value="${esc(d.email||'')}" placeholder="Email address" /></label>
     </div>
     <div class="kickoff-division-card-body">
       <div class="kickoff-notes-toolbar"><button class="scope-format-btn" data-kickoff-format="bold" type="button"><strong>B</strong></button><button class="scope-format-btn" data-kickoff-format="italic" type="button"><em>I</em></button><button class="scope-format-btn" data-kickoff-format="underline" type="button"><span class="format-u">U</span></button><button class="scope-format-btn kickoff-image-btn" data-kickoff-paste-image type="button">Paste Screenshot</button><button class="scope-format-btn kickoff-image-btn" data-kickoff-add-image type="button">Upload Image</button><span class="kickoff-image-hint">Images stay inline with the division notes.</span><input class="hidden" data-kickoff-image-input type="file" accept="image/*"></div>
@@ -2667,12 +2672,26 @@ async function buildKickoffPdf(options={}){
     background();
     return 1.18;
   }
+  function divisionContactLayout(d){
+    const gap=.14,pad=.16,w=(contentW-pad*2-gap*2)/3;
+    doc.setFont('helvetica','normal');doc.setFontSize(11);
+    const cells=[['CONTACT NAME',d.contactName],['PHONE',d.phone],['EMAIL',d.email]].map(([label,value])=>({label,lines:doc.splitTextToSize(String(value||'—'),w)}));
+    return {gap,pad,w,cells,h:.45+Math.max(...cells.map(c=>c.lines.length))*.19};
+  }
+  function divisionHeaderHeight(d){return 1.15+.12+divisionContactLayout(d).h;}
   function drawDivisionHeader(d,continued=false){
     let dy=newKickoffDivisionPage();const h=1.15;doc.setFillColor(249,249,248);doc.setDrawColor(...border);doc.roundedRect(contentX,dy,contentW,h,.08,.08,'FD');
     const divisionDescription=`${d.number?d.number+' - ':''}${d.description||'—'}${continued?' (CONT.)':''}`;
     const cols=[{x:contentX+.16,w:2.55,label:'DIVISION',value:divisionDescription},{x:contentX+2.78,w:2.18,label:'SUBCONTRACTOR',value:d.subcontractor||'—'},{x:contentX+5.05,w:1.30,label:'BUDGET',value:d.budget||'—'}];
     cols.forEach(c=>{doc.setFont('helvetica','bold');doc.setFontSize(12);doc.setTextColor(...orange);doc.text(c.label,c.x,dy+.27);doc.setFont('helvetica','bold');doc.setFontSize(12);doc.setTextColor(...text);const lines=doc.splitTextToSize(String(c.value),c.w);doc.text(lines.slice(0,3),c.x,dy+.55,{lineHeightFactor:1.14});});
-    return dy+h+.18;
+    const contacts=divisionContactLayout(d),contactY=dy+h+.12;
+    doc.setFillColor(249,249,248);doc.setDrawColor(...border);doc.roundedRect(contentX,contactY,contentW,contacts.h,.08,.08,'FD');
+    contacts.cells.forEach((cell,i)=>{
+      const x=contentX+contacts.pad+i*(contacts.w+contacts.gap);
+      doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(...orange);doc.text(cell.label,x,contactY+.22);
+      doc.setFont('helvetica','normal');doc.setFontSize(11);doc.setTextColor(...text);doc.text(cell.lines,x,contactY+.44,{lineHeightFactor:1.2});
+    });
+    return contactY+contacts.h+.18;
   }
   function kickoffRunStyle(run={}){return run.bold&&run.italic?'bolditalic':run.bold?'bold':run.italic?'italic':'normal';}
   function kickoffRunWidth(value,run){doc.setFont('helvetica',kickoffRunStyle(run));doc.setFontSize(12);return doc.getTextWidth(String(value||''));}
@@ -2694,7 +2713,7 @@ async function buildKickoffPdf(options={}){
         try{
           const asset=await getQuoteAsset(block.key);if(!asset?.blob)continue;
           const data=await blobToDataUrl(asset.blob);const iw=Number(asset.width)||1200,ih=Number(asset.height)||800;
-          const maxW=contentW-.16,fullMaxH=bottom-(1.18+1.15+.18)-.10;
+          const maxW=contentW-.16,fullMaxH=bottom-(1.18+divisionHeaderHeight(d)+.18)-.10;
           let w=maxW,h=w*(ih/iw);if(h>fullMaxH){h=fullMaxH;w=h*(iw/ih);}
           if(dy+h+.12>bottom)dy=drawDivisionHeader(d,true);
           const available=bottom-dy-.08;if(h>available){h=available;w=h*(iw/ih);}
