@@ -2678,12 +2678,18 @@ async function buildKickoffPdf(options={}){
     const cells=[['CONTACT NAME',d.contactName],['PHONE',d.phone],['EMAIL',d.email]].map(([label,value])=>({label,lines:doc.splitTextToSize(String(value||'—'),w)}));
     return {gap,pad,w,cells,h:.45+Math.max(...cells.map(c=>c.lines.length))*.19};
   }
-  function divisionHeaderHeight(d){return 1.15+.12+divisionContactLayout(d).h;}
-  function drawDivisionHeader(d,continued=false){
-    let dy=newKickoffDivisionPage();const h=1.15;doc.setFillColor(249,249,248);doc.setDrawColor(...border);doc.roundedRect(contentX,dy,contentW,h,.08,.08,'FD');
+  function divisionSummaryLayout(d,continued=false){
     const divisionDescription=`${d.number?d.number+' - ':''}${d.description||'—'}${continued?' (CONT.)':''}`;
     const cols=[{x:contentX+.16,w:2.55,label:'DIVISION',value:divisionDescription},{x:contentX+2.78,w:2.18,label:'SUBCONTRACTOR',value:d.subcontractor||'—'},{x:contentX+5.05,w:1.30,label:'BUDGET',value:d.budget||'—'}];
-    cols.forEach(c=>{doc.setFont('helvetica','bold');doc.setFontSize(12);doc.setTextColor(...orange);doc.text(c.label,c.x,dy+.27);doc.setFont('helvetica','bold');doc.setFontSize(12);doc.setTextColor(...text);const lines=doc.splitTextToSize(String(c.value),c.w);doc.text(lines.slice(0,3),c.x,dy+.55,{lineHeightFactor:1.14});});
+    doc.setFont('helvetica','bold');doc.setFontSize(12);
+    cols.forEach(c=>{c.lines=doc.splitTextToSize(String(c.value),c.w).slice(0,3);});
+    return {cols,h:.45+Math.max(...cols.map(c=>c.lines.length))*.19};
+  }
+  function divisionHeaderHeight(d){return divisionSummaryLayout(d,true).h+.12+divisionContactLayout(d).h;}
+  function drawDivisionHeader(d,continued=false){
+    const dy=newKickoffDivisionPage(),{cols,h}=divisionSummaryLayout(d,continued);
+    doc.setFillColor(249,249,248);doc.setDrawColor(...border);doc.roundedRect(contentX,dy,contentW,h,.08,.08,'FD');
+    cols.forEach(c=>{doc.setFont('helvetica','bold');doc.setFontSize(12);doc.setTextColor(...orange);doc.text(c.label,c.x,dy+.22);doc.setTextColor(...text);doc.text(c.lines,c.x,dy+.44,{lineHeightFactor:1.14});});
     const contacts=divisionContactLayout(d),contactY=dy+h+.12;
     doc.setFillColor(249,249,248);doc.setDrawColor(...border);doc.roundedRect(contentX,contactY,contentW,contacts.h,.08,.08,'FD');
     contacts.cells.forEach((cell,i)=>{
