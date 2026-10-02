@@ -1836,7 +1836,52 @@ function renderKickoffDivisions(){
         }
       });
       el.addEventListener('keydown',e=>{
-        if((e.key==='Tab'||e.key==='Enter')&&el.dataset.kickoffAutocompleteActive==='true'){
+        const autocompleteActive=el.dataset.kickoffAutocompleteActive==='true';
+        if(autocompleteActive&&(e.key==='Backspace'||e.key==='Delete')&&!e.ctrlKey&&!e.metaKey&&!e.altKey){
+          const typed=String(el.dataset.kickoffAutocompleteTyped||'');
+          const start=Number(el.selectionStart);
+          const end=Number(el.selectionEnd);
+          const fullSelection=start===0&&end===el.value.length;
+          const autoSuffixSelected=start===typed.length&&end===el.value.length;
+
+          // If the user manually selected text or moved the caret, let the
+          // browser handle Backspace/Delete normally and stop treating the
+          // current value as an automatic completion.
+          if(fullSelection||!autoSuffixSelected){
+            commitKickoffDescriptionAutocomplete(el);
+          }else if(e.key==='Delete'){
+            e.preventDefault();
+            el.value=typed;
+            commitKickoffDescriptionAutocomplete(el);
+            try{el.setSelectionRange(typed.length,typed.length);}catch{}
+            scheduleDivisionSave();
+            return;
+          }else{
+            e.preventDefault();
+            const nextTyped=typed.slice(0,-1);
+            if(!nextTyped){
+              el.value='';
+              commitKickoffDescriptionAutocomplete(el);
+              try{el.setSelectionRange(0,0);}catch{}
+            }else{
+              const card=el.closest('.kickoff-division-card');
+              const p=getCurrentKickoffProject();
+              const number=card?.querySelector('[data-kickoff-division-field="number"]')?.value||'';
+              const match=kickoffDivisionDescriptionCandidates(p,number).find(candidate=>
+                candidate.length>nextTyped.length&&candidate.toLowerCase().startsWith(nextTyped.toLowerCase())
+              );
+              if(match)setKickoffDescriptionSuggestion(el,match,nextTyped);
+              else{
+                el.value=nextTyped;
+                commitKickoffDescriptionAutocomplete(el);
+                try{el.setSelectionRange(nextTyped.length,nextTyped.length);}catch{}
+              }
+            }
+            scheduleDivisionSave();
+            return;
+          }
+        }
+        if((e.key==='Tab'||e.key==='Enter')&&autocompleteActive){
           commitKickoffDescriptionAutocomplete(el);
           scheduleDivisionSave();
           if(e.key==='Enter'){
