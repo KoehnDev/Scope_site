@@ -1580,6 +1580,44 @@ function moveKickoffPageToken(token,delta){
   renderKickoffDivisions();renderKickoffPageOrder();renderKickoffQuotes();scheduleKickoffPdfPreview(220);
 }
 
+const KICKOFF_DIVISION_DESCRIPTION_SUGGESTIONS = {
+  "00":["Bidding Requirements","Contracting Requirements","Procurement"],
+  "01":["General Conditions","Project Management","Supervision","Mobilization","Temporary Facilities","Safety","Closeout"],
+  "02":["Demolition","Selective Demolition","Site Demolition","Building Demolition","Concrete Demolition","Abatement"],
+  "03":["Cast-in-Place Concrete","Structural Concrete","Site Concrete","Concrete Paving","Foundations","Footings","Slab-on-Grade"],
+  "04":["CMU","Concrete Masonry","Brick Masonry","Stone Masonry"],
+  "05":["Structural Steel","Miscellaneous Metals","Metal Fabrications","Steel Fabrications","Handrails and Railings"],
+  "06":["Rough Carpentry","Finish Carpentry","Architectural Woodwork","Millwork"],
+  "07":["Roofing","Insulation","Waterproofing","Joint Sealants","Metal Wall Panels","Siding"],
+  "08":["Doors and Frames","Door Hardware","Overhead Doors","Storefront","Windows","Glass and Glazing"],
+  "09":["Framing and Drywall","Light Gauge Metal Framing","Gypsum Board","Acoustical Ceilings","Flooring","Painting","Tile"],
+  "10":["Toilet Accessories","Toilet Partitions","Signage","Fire Extinguishers","Lockers"],
+  "11":["Equipment","Appliances","Foodservice Equipment"],
+  "12":["Casework","Countertops","Window Treatments","Furniture"],
+  "13":["Pre-Engineered Metal Building","PEMB","Metal Building Systems","Special Construction"],
+  "14":["Elevators","Lifts","Conveying Equipment"],
+  "21":["Fire Sprinklers","Fire Suppression"],
+  "22":["Plumbing","Plumbing Fixtures","Domestic Water","Sanitary Sewer"],
+  "23":["HVAC","Mechanical","Heating and Cooling","Ventilation"],
+  "25":["Building Automation","Controls","Integrated Automation"],
+  "26":["Electrical","Power","Lighting","Site Lighting"],
+  "27":["Communications","Data","Low Voltage","Structured Cabling"],
+  "28":["Fire Alarm","Security","Access Control","Electronic Safety and Security"],
+  "31":["Earthwork","Excavation","Grading","Sitework","Trenching"],
+  "32":["Exterior Improvements","Asphalt Paving","Concrete Paving","Site Concrete","Landscaping","Fencing","Pavement Markings","Bollards","Light Pole Bases","Exterior Equipment Pads"],
+  "33":["Utilities","Site Utilities","Storm Sewer","Sanitary Sewer","Water Utilities"],
+  "34":["Transportation","Roadway Improvements"],
+  "35":["Waterway and Marine Construction","Marine Construction"],
+  "40":["Process Integration"],
+  "41":["Material Processing Equipment","Material Handling Equipment"],
+  "42":["Process Heating Equipment","Process Cooling Equipment","Process Drying Equipment"],
+  "43":["Process Gas Equipment","Process Liquid Handling Equipment","Process Storage Equipment"],
+  "44":["Pollution Control Equipment","Waste Control Equipment"],
+  "45":["Manufacturing Equipment","Industry-Specific Manufacturing Equipment"],
+  "46":["Water Equipment","Wastewater Equipment"],
+  "48":["Power Generation","Electrical Power Generation"]
+};
+
 function normalizeKickoffDivisionNumber(value){
   const raw=String(value||"").trim();
   return /^\d$/.test(raw)?raw.padStart(2,"0"):raw;
@@ -1594,6 +1632,7 @@ function kickoffDivisionDescriptionCandidates(p,number){
   };
   const standard=CSI_DIVISIONS.find(([divisionNumber])=>divisionNumber===n)?.[1]||"";
   add(standard);
+  (KICKOFF_DIVISION_DESCRIPTION_SUGGESTIONS[n]||[]).forEach(add);
   add(p?.divisions?.[n]?.title||"");
   const owner=state.currentProjectOwner||state.user?.username||"";
   if(owner){
