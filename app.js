@@ -1580,6 +1580,84 @@ function moveKickoffPageToken(token,delta){
   renderKickoffDivisions();renderKickoffPageOrder();renderKickoffQuotes();scheduleKickoffPdfPreview(220);
 }
 
+function normalizeKickoffDivisionNumber(value){
+  const raw=String(value||"").trim();
+  return /^\d$/.test(raw)?raw.padStart(2,"0"):raw;
+}
+function kickoffDivisionDescriptionCandidates(p,number){
+  const n=normalizeKickoffDivisionNumber(number), values=[], seen=new Set();
+  const add=value=>{
+    const text=String(value||"").trim();
+    const key=text.toLowerCase();
+    if(!text||seen.has(key))return;
+    seen.add(key);values.push(text);
+  };
+  const standard=CSI_DIVISIONS.find(([divisionNumber])=>divisionNumber===n)?.[1]||"";
+  add(standard);
+  add(p?.divisions?.[n]?.title||"");
+  const owner=state.currentProjectOwner||state.user?.username||"";
+  if(owner){
+    getProjectsForUser(owner,{includeDeleted:false}).forEach(project=>{
+      (project?.kickoff?.divisions||[]).forEach(d=>{
+        if(normalizeKickoffDivisionNumber(d?.number)===n)add(d?.description);
+      });
+    });
+  }
+  return values;
+}
+function setKickoffDescriptionSuggestion(input,suggestion,typedPrefix=""){
+  if(!input||!suggestion)return;
+  input.value=suggestion;
+  input.dataset.kickoffAutocompleteActive="true";
+  input.dataset.kickoffAutocompleteTyped=typedPrefix;
+  if(document.activeElement===input){
+    try{input.setSelectionRange(typedPrefix.length,suggestion.length);}catch{}
+  }
+}
+function suggestKickoffDescriptionFromNumber(card){
+  const p=getCurrentKickoffProject();
+  const numberInput=card?.querySelector('[data-kickoff-division-field="number"]');
+  const descriptionInput=card?.querySelector('[data-kickoff-division-field="description"]');
+  if(!p||!numberInput||!descriptionInput)return;
+  const hasManualValue=String(descriptionInput.value||"").trim()&&descriptionInput.dataset.kickoffAutocompleteActive!=="true";
+  if(hasManualValue)return;
+  const suggestion=kickoffDivisionDescriptionCandidates(p,numberInput.value)[0]||"";
+  if(!suggestion){
+    if(descriptionInput.dataset.kickoffAutocompleteActive==="true"){
+      descriptionInput.value="";
+      delete descriptionInput.dataset.kickoffAutocompleteActive;
+      delete descriptionInput.dataset.kickoffAutocompleteTyped;
+    }
+    return;
+  }
+  setKickoffDescriptionSuggestion(descriptionInput,suggestion,"");
+}
+function continueKickoffDescriptionAutocomplete(input){
+  const card=input?.closest('.kickoff-division-card');
+  const p=getCurrentKickoffProject();
+  const number=card?.querySelector('[data-kickoff-division-field="number"]')?.value||"";
+  if(!input||!p)return;
+  const typed=String(input.value||"");
+  if(!typed){
+    delete input.dataset.kickoffAutocompleteActive;
+    delete input.dataset.kickoffAutocompleteTyped;
+    return;
+  }
+  const match=kickoffDivisionDescriptionCandidates(p,number).find(candidate=>
+    candidate.length>typed.length&&candidate.toLowerCase().startsWith(typed.toLowerCase())
+  );
+  if(match)setKickoffDescriptionSuggestion(input,match,typed);
+  else{
+    delete input.dataset.kickoffAutocompleteActive;
+    delete input.dataset.kickoffAutocompleteTyped;
+  }
+}
+function commitKickoffDescriptionAutocomplete(input){
+  if(!input)return;
+  delete input.dataset.kickoffAutocompleteActive;
+  delete input.dataset.kickoffAutocompleteTyped;
+}
+
 function addKickoffDivision(sourceNumber=""){
   const p=getCurrentKickoffProject(); if(!p)return;
   let division={id:uid(),number:"",description:"",subcontractor:"",contactName:"",phone:"",email:"",budget:"",notesHtml:"",sourceDivisionNumber:"",proposalReferenceNumber:""};
@@ -1703,7 +1781,40 @@ function renderKickoffDivisions(){
     editor._kickoffInsertRange=null;
   }));
   $$('[data-kickoff-format]',list).forEach(b=>b.addEventListener('click',()=>kickoffFormatSelection(b.closest('.kickoff-division-card')?.querySelector('.kickoff-rich-editor'),b.dataset.kickoffFormat)));
-  $$('input[data-kickoff-division-field]',list).forEach(el=>el.addEventListener('input',()=>{clearTimeout(state.kickoffSaveTimer);state.kickoffSaveTimer=setTimeout(()=>{collectKickoffDivisionsFromDom();scheduleKickoffPdfPreview(650);},300);}));
+  $('input[data-kickoff-division-field]',list).forEach(el=>{
+    const scheduleDivisionSave=()=>{clearTimeout(state.kickoffSaveTimer);state.kickoffSaveTimer=setTimeout(()=>{collectKickoffDivisionsFromDom();scheduleKickoffPdfPreview(650);},300);};
+    const field=el.dataset.kickoffDivisionField;
+    el.addEventListener('input',()=>{
+      if(field==='number')suggestKickoffDescriptionFromNumber(el.closest('.kickoff-division-card'));
+      if(field==='description')continueKickoffDescriptionAutocomplete(el);
+      scheduleDivisionSave();
+    });
+    if(field==='description'){
+      el.addEventListener('focus',()=>{
+        if(el.dataset.kickoffAutocompleteActive==='true'){
+          const typed=el.dataset.kickoffAutocompleteTyped||'';
+          try{el.setSelectionRange(typed.length,el.value.length);}catch{}
+        }
+      });
+      el.addEventListener('keydown',e=>{
+        if((e.key==='Tab'||e.key==='Enter')&&el.dataset.kickoffAutocompleteActive==='true'){
+          commitKickoffDescriptionAutocomplete(el);
+          scheduleDivisionSave();
+          if(e.key==='Enter'){
+            e.preventDefault();
+            const next=el.closest('.kickoff-division-card')?.querySelector('[data-kickoff-division-field="subcontractor"]');
+            next?.focus();
+          }
+        }
+      });
+      el.addEventListener('blur',()=>{
+        if(el.dataset.kickoffAutocompleteActive==='true'){
+          commitKickoffDescriptionAutocomplete(el);
+          scheduleDivisionSave();
+        }
+      });
+    }
+  });
   $$('.kickoff-rich-editor',list).forEach(el=>{
     el.addEventListener('input',()=>{clearTimeout(state.kickoffSaveTimer);state.kickoffSaveTimer=setTimeout(()=>{collectKickoffDivisionsFromDom();scheduleKickoffPdfPreview(650);},320);});
     el.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&['b','i','u'].includes(e.key.toLowerCase())){e.preventDefault();const cmd={b:'bold',i:'italic',u:'underline'}[e.key.toLowerCase()];kickoffFormatSelection(el,cmd);}});
