@@ -1820,7 +1820,7 @@ function renderKickoffDivisions(){
     editor._kickoffInsertRange=null;
   }));
   $$('[data-kickoff-format]',list).forEach(b=>b.addEventListener('click',()=>kickoffFormatSelection(b.closest('.kickoff-division-card')?.querySelector('.kickoff-rich-editor'),b.dataset.kickoffFormat)));
-  $('input[data-kickoff-division-field]',list).forEach(el=>{
+  $$('input[data-kickoff-division-field]',list).forEach(el=>{
     const scheduleDivisionSave=()=>{clearTimeout(state.kickoffSaveTimer);state.kickoffSaveTimer=setTimeout(()=>{collectKickoffDivisionsFromDom();scheduleKickoffPdfPreview(650);},300);};
     const field=el.dataset.kickoffDivisionField;
     el.addEventListener('input',()=>{
@@ -1854,12 +1854,12 @@ function renderKickoffDivisions(){
       });
     }
   });
-  $('.kickoff-division-card',list).forEach(card=>{
+  $$('.kickoff-division-card',list).forEach(card=>{
     const number=String(card.querySelector('[data-kickoff-division-field="number"]')?.value||'').trim();
     const description=String(card.querySelector('[data-kickoff-division-field="description"]')?.value||'').trim();
     if(number&&!description)suggestKickoffDescriptionFromNumber(card);
   });
-  $('.kickoff-rich-editor',list).forEach(el=>{
+  $$('.kickoff-rich-editor',list).forEach(el=>{
     el.addEventListener('input',()=>{clearTimeout(state.kickoffSaveTimer);state.kickoffSaveTimer=setTimeout(()=>{collectKickoffDivisionsFromDom();scheduleKickoffPdfPreview(650);},320);});
     el.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&['b','i','u'].includes(e.key.toLowerCase())){e.preventDefault();const cmd={b:'bold',i:'italic',u:'underline'}[e.key.toLowerCase()];kickoffFormatSelection(el,cmd);}});
     el.addEventListener('paste',async e=>{
