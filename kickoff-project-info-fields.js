@@ -11,11 +11,10 @@
   const projectOverviewLabel = document.querySelector('[data-kickoff-info="projectOverview"]')?.closest('label');
 
   let gcProjectHeader = document.querySelector('.kickoff-gc-project-header');
-  if (projectOverviewLabel && !gcProjectHeader) {
+  if (!gcProjectHeader) {
     gcProjectHeader = document.createElement('div');
-    gcProjectHeader.className = 'full kickoff-project-section-header kickoff-gc-project-header';
+    gcProjectHeader.className = 'kickoff-project-section-header kickoff-gc-project-header';
     gcProjectHeader.textContent = 'General Contractor Project';
-    projectOverviewLabel.insertAdjacentElement('afterend', gcProjectHeader);
   }
 
   if (targetGpLabel && !document.querySelector('[data-kickoff-info="revenue"]')) {
@@ -50,7 +49,7 @@
 
     selfPerformSection = document.createElement('div');
     selfPerformSection.id = 'kickoffSelfPerformSection';
-    selfPerformSection.className = 'full kickoff-self-perform-section hidden';
+    selfPerformSection.className = 'full kickoff-project-financial-section kickoff-self-perform-section hidden';
     selfPerformSection.innerHTML = `
       <div class="kickoff-project-section-header kickoff-self-perform-header">Self Perform Project</div>
       <label class="kickoff-self-contingency-field">Contingency %<input data-kickoff-info="selfPerformContingencyPercent" inputmode="decimal" maxlength="5" placeholder="0" aria-label="Self perform contingency percent" /></label>
@@ -87,30 +86,69 @@
     contingencyLabel.insertAdjacentElement('afterend', requirementsLabel);
   }
 
+  let projectDetailsSection = document.querySelector('#kickoffProjectDetailsSection');
+  if (!projectDetailsSection) {
+    projectDetailsSection = document.createElement('div');
+    projectDetailsSection.id = 'kickoffProjectDetailsSection';
+    projectDetailsSection.className = 'full kickoff-project-details-section';
+    projectDetailsSection.innerHTML = `
+      <div class="kickoff-project-details-title">Project Details</div>
+      <div class="kickoff-project-details-grid"></div>`;
+  }
+
+  let projectFinancialHeader = document.querySelector('.kickoff-project-financial-header');
+  if (!projectFinancialHeader) {
+    projectFinancialHeader = document.createElement('div');
+    projectFinancialHeader.className = 'full kickoff-project-section-header kickoff-project-financial-header';
+    projectFinancialHeader.textContent = 'Project Financial Information';
+  }
+
+  let gcSection = document.querySelector('#kickoffGcProjectSection');
+  if (!gcSection && financialBlock && contingencyLabel) {
+    gcSection = document.createElement('div');
+    gcSection.id = 'kickoffGcProjectSection';
+    gcSection.className = 'full kickoff-project-financial-section kickoff-gc-section';
+    gcSection.appendChild(gcProjectHeader);
+    contingencyLabel.classList.add('kickoff-project-contingency-field');
+    financialBlock.classList.add('kickoff-project-financial-inner');
+    gcSection.appendChild(contingencyLabel);
+    gcSection.appendChild(financialBlock);
+  }
+
+  const selfPerformContingencyLabel = document.querySelector('.kickoff-self-contingency-field');
+  if (selfPerformContingencyLabel) selfPerformContingencyLabel.classList.add('kickoff-project-contingency-field');
+  const selfPerformFinancialBlock = document.querySelector('.kickoff-self-perform-financial-block');
+  if (selfPerformFinancialBlock) selfPerformFinancialBlock.classList.add('kickoff-project-financial-inner');
+
   function arrangeKickoffProjectInfoFields() {
     const form = kickoffFormCard || document.querySelector('#kickoffInfoTab .kickoff-form-card');
     if (!form) return;
     const fieldLabel = name => document.querySelector(`[data-kickoff-info="${name}"]`)?.closest('label');
     const mapsBlock = document.querySelector('.kickoff-map-options');
-    const ordered = [
-      fieldLabel('projectOverview'),
-      gcProjectHeader,
+    const detailsGrid = projectDetailsSection?.querySelector('.kickoff-project-details-grid');
+
+    [
       fieldLabel('owner'),
       fieldLabel('contractType'),
       fieldLabel('taxStatus'),
-      document.querySelector('.kickoff-contingency-field'),
-      document.querySelector('.kickoff-contract-requirements-field'),
-      targetGpLabel,
-      financialBlock,
-      selfPerformToggleRow,
-      selfPerformSection,
       fieldLabel('startDate'),
       fieldLabel('endDate'),
+      fieldLabel('projectLocation')
+    ].filter(Boolean).forEach(node => detailsGrid?.appendChild(node));
+
+    const ordered = [
+      fieldLabel('projectOverview'),
+      projectDetailsSection,
+      mapsBlock,
+      document.querySelector('.kickoff-contract-requirements-field'),
       document.querySelector('.kickoff-permitting-field'),
       fieldLabel('ownerContacts'),
-      fieldLabel('projectLocation'),
-      mapsBlock,
-      fieldLabel('designTeam')
+      fieldLabel('designTeam'),
+      projectFinancialHeader,
+      gcSection,
+      selfPerformToggleRow,
+      selfPerformSection,
+      targetGpLabel
     ];
     ordered.filter(Boolean).forEach(node => form.appendChild(node));
   }
@@ -123,21 +161,31 @@
     .kickoff-financial-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
     .kickoff-financial-grid label{min-width:0}
     .kickoff-gross-profit{background:#f1f2f3;font-weight:700;color:#45494d}
-    .kickoff-contingency-field input{max-width:76px;justify-self:start;text-align:right}
     .kickoff-permitting-field textarea,.kickoff-contract-requirements-field textarea{min-height:104px}
     .kickoff-project-section-header{grid-column:1/-1;margin:4px 0 -2px;padding:4px 0 7px;border-bottom:1px solid #d9dde1;color:#555a60;font-size:13px;font-weight:900;letter-spacing:.04em;text-transform:uppercase}
-    .kickoff-gc-project-header{margin-top:2px}
+    .kickoff-project-details-section{border:1px solid #d9dde1;border-radius:10px;background:#fff;padding:13px 14px 14px}
+    .kickoff-project-details-title{color:#555a60;font-size:12px;font-weight:900;margin-bottom:10px;text-transform:uppercase}
+    .kickoff-project-details-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+    .kickoff-project-details-grid>label{min-width:0;margin:0}
+    .kickoff-project-details-grid>label.full{grid-column:auto}
+    .kickoff-project-details-grid textarea{min-height:42px}
+    .kickoff-project-financial-header{margin-top:8px}
+    .kickoff-project-financial-section{display:grid;grid-template-columns:minmax(150px,.34fr) minmax(0,1fr);gap:12px;border:1px solid #d9dde1;border-radius:10px;background:#fff;padding:14px}
+    .kickoff-project-financial-section.hidden{display:none}
+    .kickoff-project-financial-section .kickoff-project-section-header{grid-column:1/-1;margin:0 0 2px;padding-top:0}
+    .kickoff-project-contingency-field{grid-column:1/2;align-self:start}
+    .kickoff-project-contingency-field input{max-width:90px;justify-self:start;text-align:right}
+    .kickoff-project-financial-inner{grid-column:2/3}
     .kickoff-self-perform-toggle-row{display:flex;align-items:center;justify-content:space-between;gap:16px;border:1px solid #d9dde1;border-radius:10px;background:#fff;padding:12px 14px}
     .kickoff-self-perform-toggle-copy{display:flex;flex-direction:column;gap:2px}
     .kickoff-self-perform-toggle-copy strong{color:#555a60;font-size:12px}
     .kickoff-self-perform-toggle-copy span{color:#8a8e92;font-size:10px;line-height:1.35}
-    .kickoff-self-perform-section{display:grid;grid-template-columns:1fr 1fr;gap:12px;border:1px solid #d9dde1;border-radius:10px;background:#fff;padding:14px}
-    .kickoff-self-perform-section.hidden{display:none}
-    .kickoff-self-perform-header{margin:0 0 2px;padding-top:0}
-    .kickoff-self-contingency-field{grid-column:1/2}
-    .kickoff-self-contingency-field input{max-width:76px;justify-self:start;text-align:right}
-    .kickoff-self-perform-financial-block{grid-column:1/-1}
-    @media (max-width:760px){.kickoff-financial-grid{grid-template-columns:1fr}.kickoff-self-perform-section{grid-template-columns:1fr}.kickoff-self-contingency-field{grid-column:1/-1}}
+    @media (max-width:900px){.kickoff-project-details-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+    @media (max-width:760px){
+      .kickoff-financial-grid,.kickoff-project-details-grid{grid-template-columns:1fr}
+      .kickoff-project-financial-section{grid-template-columns:1fr}
+      .kickoff-project-contingency-field,.kickoff-project-financial-inner{grid-column:1/-1}
+    }
   `;
   document.head.appendChild(style);
 
