@@ -34,6 +34,11 @@
     const existing = String(contractTypeInput.value || '').trim();
     contractTypeSelect.value = existing === 'Lump Sum' ? 'Lump Sum / Fixed Price' : existing;
     contractTypeInput.replaceWith(contractTypeSelect);
+
+    contractTypeSelect.addEventListener('change', () => {
+      if (typeof saveKickoffInfoFromForm === 'function') saveKickoffInfoFromForm();
+      if (typeof scheduleKickoffPdfPreview === 'function') scheduleKickoffPdfPreview(120);
+    });
   }
 
   let gcProjectHeader = document.querySelector('.kickoff-gc-project-header');
@@ -381,6 +386,11 @@
 
   function hydrateKickoffFinancialFields(project) {
     const info = project?.kickoff?.projectInfo || {};
+    const contractTypeSelect = document.querySelector('select[data-kickoff-info="contractType"]');
+    if (contractTypeSelect) {
+      const savedContractType = String(info.contractType || '').trim();
+      contractTypeSelect.value = savedContractType === 'Lump Sum' ? 'Lump Sum / Fixed Price' : savedContractType;
+    }
     if (revenueInput) revenueInput.value = info.revenue || info.contractValue || '';
     if (projectCostInput) projectCostInput.value = info.projectCost || '';
     if (grossProfitInput) grossProfitInput.value = info.grossProfit || '';
