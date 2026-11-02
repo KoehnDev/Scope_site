@@ -7,6 +7,16 @@
 
   const targetGpInput = document.querySelector('[data-kickoff-info="targetGP"]');
   const targetGpLabel = targetGpInput?.closest('label');
+  const kickoffFormCard = document.querySelector('#kickoffInfoTab .kickoff-form-card');
+  const projectOverviewLabel = document.querySelector('[data-kickoff-info="projectOverview"]')?.closest('label');
+
+  let gcProjectHeader = document.querySelector('.kickoff-gc-project-header');
+  if (projectOverviewLabel && !gcProjectHeader) {
+    gcProjectHeader = document.createElement('div');
+    gcProjectHeader.className = 'full kickoff-project-section-header kickoff-gc-project-header';
+    gcProjectHeader.textContent = 'General Contractor Project';
+    projectOverviewLabel.insertAdjacentElement('afterend', gcProjectHeader);
+  }
 
   if (targetGpLabel && !document.querySelector('[data-kickoff-info="revenue"]')) {
     targetGpLabel.classList.add('hidden');
@@ -24,6 +34,37 @@
   }
 
   const financialBlock = document.querySelector('.kickoff-financial-block');
+
+  let selfPerformToggleRow = document.querySelector('.kickoff-self-perform-toggle-row');
+  let selfPerformSection = document.querySelector('#kickoffSelfPerformSection');
+  if (financialBlock && !selfPerformToggleRow) {
+    selfPerformToggleRow = document.createElement('div');
+    selfPerformToggleRow.className = 'full kickoff-self-perform-toggle-row';
+    selfPerformToggleRow.innerHTML = `
+      <div class="kickoff-self-perform-toggle-copy">
+        <strong>Self Perform Project Information</strong>
+        <span>Include separate self-perform contingency and financial information in the kickoff.</span>
+      </div>
+      <label class="switch-label"><input id="kickoffSelfPerformEnabled" type="checkbox"><span class="switch"></span>Include</label>`;
+    financialBlock.insertAdjacentElement('afterend', selfPerformToggleRow);
+
+    selfPerformSection = document.createElement('div');
+    selfPerformSection.id = 'kickoffSelfPerformSection';
+    selfPerformSection.className = 'full kickoff-self-perform-section hidden';
+    selfPerformSection.innerHTML = `
+      <div class="kickoff-project-section-header kickoff-self-perform-header">Self Perform Project</div>
+      <label class="kickoff-self-contingency-field">Contingency %<input data-kickoff-info="selfPerformContingencyPercent" inputmode="decimal" maxlength="5" placeholder="0" aria-label="Self perform contingency percent" /></label>
+      <div class="kickoff-financial-block kickoff-self-perform-financial-block">
+        <div class="kickoff-financial-title">Project Financials</div>
+        <div class="kickoff-financial-grid">
+          <label>Revenue<input class="kickoff-financial-currency" data-kickoff-info="selfPerformRevenue" inputmode="decimal" placeholder="$0" /></label>
+          <label>Project Cost<input class="kickoff-financial-currency" data-kickoff-info="selfPerformProjectCost" inputmode="decimal" placeholder="$0" /></label>
+          <label>Gross Profit<input class="kickoff-financial-currency kickoff-gross-profit" data-kickoff-info="selfPerformGrossProfit" placeholder="$0" readonly aria-readonly="true" /></label>
+        </div>
+      </div>`;
+    selfPerformToggleRow.insertAdjacentElement('afterend', selfPerformSection);
+  }
+
   if (financialBlock && !document.querySelector('[data-kickoff-info="contingencyPercent"]')) {
     const contingencyLabel = document.createElement('label');
     contingencyLabel.className = 'kickoff-contingency-field';
@@ -46,6 +87,35 @@
     contingencyLabel.insertAdjacentElement('afterend', requirementsLabel);
   }
 
+  function arrangeKickoffProjectInfoFields() {
+    const form = kickoffFormCard || document.querySelector('#kickoffInfoTab .kickoff-form-card');
+    if (!form) return;
+    const fieldLabel = name => document.querySelector(`[data-kickoff-info="${name}"]`)?.closest('label');
+    const mapsBlock = document.querySelector('.kickoff-map-options');
+    const ordered = [
+      fieldLabel('projectOverview'),
+      gcProjectHeader,
+      fieldLabel('owner'),
+      fieldLabel('contractType'),
+      fieldLabel('taxStatus'),
+      document.querySelector('.kickoff-contingency-field'),
+      document.querySelector('.kickoff-contract-requirements-field'),
+      targetGpLabel,
+      financialBlock,
+      selfPerformToggleRow,
+      selfPerformSection,
+      fieldLabel('startDate'),
+      fieldLabel('endDate'),
+      document.querySelector('.kickoff-permitting-field'),
+      fieldLabel('ownerContacts'),
+      fieldLabel('projectLocation'),
+      mapsBlock,
+      fieldLabel('designTeam')
+    ];
+    ordered.filter(Boolean).forEach(node => form.appendChild(node));
+  }
+  arrangeKickoffProjectInfoFields();
+
   const style = document.createElement('style');
   style.textContent = `
     .kickoff-financial-block{border:1px solid #d9dde1;border-radius:10px;background:#f8f9fa;padding:13px 14px 14px}
@@ -55,7 +125,19 @@
     .kickoff-gross-profit{background:#f1f2f3;font-weight:700;color:#45494d}
     .kickoff-contingency-field input{max-width:76px;justify-self:start;text-align:right}
     .kickoff-permitting-field textarea,.kickoff-contract-requirements-field textarea{min-height:104px}
-    @media (max-width:760px){.kickoff-financial-grid{grid-template-columns:1fr}}
+    .kickoff-project-section-header{grid-column:1/-1;margin:4px 0 -2px;padding:4px 0 7px;border-bottom:1px solid #d9dde1;color:#555a60;font-size:13px;font-weight:900;letter-spacing:.04em;text-transform:uppercase}
+    .kickoff-gc-project-header{margin-top:2px}
+    .kickoff-self-perform-toggle-row{display:flex;align-items:center;justify-content:space-between;gap:16px;border:1px solid #d9dde1;border-radius:10px;background:#fff;padding:12px 14px}
+    .kickoff-self-perform-toggle-copy{display:flex;flex-direction:column;gap:2px}
+    .kickoff-self-perform-toggle-copy strong{color:#555a60;font-size:12px}
+    .kickoff-self-perform-toggle-copy span{color:#8a8e92;font-size:10px;line-height:1.35}
+    .kickoff-self-perform-section{display:grid;grid-template-columns:1fr 1fr;gap:12px;border:1px solid #d9dde1;border-radius:10px;background:#fff;padding:14px}
+    .kickoff-self-perform-section.hidden{display:none}
+    .kickoff-self-perform-header{margin:0 0 2px;padding-top:0}
+    .kickoff-self-contingency-field{grid-column:1/2}
+    .kickoff-self-contingency-field input{max-width:76px;justify-self:start;text-align:right}
+    .kickoff-self-perform-financial-block{grid-column:1/-1}
+    @media (max-width:760px){.kickoff-financial-grid{grid-template-columns:1fr}.kickoff-self-perform-section{grid-template-columns:1fr}.kickoff-self-contingency-field{grid-column:1/-1}}
   `;
   document.head.appendChild(style);
 
@@ -66,6 +148,11 @@
   const permittingInput = document.querySelector('[data-kickoff-info="permittingInspectionsTesting"]');
 
   const requirementsInput = document.querySelector('[data-kickoff-info="contractRequirements"]');
+  const selfPerformToggle = document.querySelector('#kickoffSelfPerformEnabled');
+  const selfPerformContingencyInput = document.querySelector('[data-kickoff-info="selfPerformContingencyPercent"]');
+  const selfPerformRevenueInput = document.querySelector('[data-kickoff-info="selfPerformRevenue"]');
+  const selfPerformProjectCostInput = document.querySelector('[data-kickoff-info="selfPerformProjectCost"]');
+  const selfPerformGrossProfitInput = document.querySelector('[data-kickoff-info="selfPerformGrossProfit"]');
 
   function moneyValue(value) {
     const raw = String(value ?? '').trim();
@@ -125,6 +212,41 @@
     });
   });
 
+  function recalcSelfPerformGrossProfit({save=false}={}) {
+    if (!selfPerformGrossProfitInput) return;
+    const revenue = moneyValue(selfPerformRevenueInput?.value);
+    const cost = moneyValue(selfPerformProjectCostInput?.value);
+    let next = selfPerformGrossProfitInput.value || '';
+    if (Number.isFinite(revenue) && Number.isFinite(cost)) next = formatCurrency(revenue - cost);
+    else next = '';
+    if (selfPerformGrossProfitInput.value !== next) selfPerformGrossProfitInput.value = next;
+    if (save && typeof scheduleKickoffSave === 'function') scheduleKickoffSave();
+  }
+
+  [selfPerformRevenueInput, selfPerformProjectCostInput].filter(Boolean).forEach(input => {
+    if (input.dataset.kickoffFinancialWired === 'true') return;
+    input.dataset.kickoffFinancialWired = 'true';
+    input.addEventListener('input', () => {
+      const next = liveDollarPrefix(input.value);
+      if (next !== input.value) {
+        const atEnd = input.selectionStart === input.value.length;
+        input.value = next;
+        if (atEnd) { try { input.setSelectionRange(next.length, next.length); } catch {} }
+      }
+      recalcSelfPerformGrossProfit({save:true});
+    });
+    input.addEventListener('focusout', () => {
+      const next = formatCurrency(input.value);
+      if (next !== input.value) input.value = next;
+      recalcSelfPerformGrossProfit({save:true});
+    });
+    input.addEventListener('change', () => {
+      recalcSelfPerformGrossProfit({save:true});
+      if (typeof saveKickoffInfoFromForm === 'function') saveKickoffInfoFromForm();
+      if (typeof scheduleKickoffPdfPreview === 'function') scheduleKickoffPdfPreview(120);
+    });
+  });
+
   function sanitizeContingencyPercent(value) {
     let raw = String(value ?? '').replace(/[^0-9.]/g, '');
     if (!raw) return '';
@@ -136,17 +258,37 @@
     return `${whole}.${decimals}`;
   }
 
-  if (contingencyInput && contingencyInput.dataset.kickoffExtraWired !== 'true') {
-    contingencyInput.dataset.kickoffExtraWired = 'true';
-    contingencyInput.addEventListener('input', () => {
-      const cleaned = sanitizeContingencyPercent(contingencyInput.value);
-      if (contingencyInput.value !== cleaned) contingencyInput.value = cleaned;
+  [contingencyInput, selfPerformContingencyInput].filter(Boolean).forEach(input => {
+    if (input.dataset.kickoffExtraWired === 'true') return;
+    input.dataset.kickoffExtraWired = 'true';
+    input.addEventListener('input', () => {
+      const cleaned = sanitizeContingencyPercent(input.value);
+      if (input.value !== cleaned) input.value = cleaned;
       if (typeof scheduleKickoffSave === 'function') scheduleKickoffSave();
     });
-    contingencyInput.addEventListener('change', () => {
-      const cleaned = sanitizeContingencyPercent(contingencyInput.value).replace(/\.$/, '');
-      if (contingencyInput.value !== cleaned) contingencyInput.value = cleaned;
+    input.addEventListener('change', () => {
+      const cleaned = sanitizeContingencyPercent(input.value).replace(/\.$/, '');
+      if (input.value !== cleaned) input.value = cleaned;
       if (typeof saveKickoffInfoFromForm === 'function') saveKickoffInfoFromForm();
+      if (typeof scheduleKickoffPdfPreview === 'function') scheduleKickoffPdfPreview(120);
+    });
+  });
+
+  function syncSelfPerformVisibility() {
+    const enabled = Boolean(selfPerformToggle?.checked);
+    selfPerformSection?.classList.toggle('hidden', !enabled);
+  }
+
+  if (selfPerformToggle && selfPerformToggle.dataset.kickoffSelfPerformWired !== 'true') {
+    selfPerformToggle.dataset.kickoffSelfPerformWired = 'true';
+    selfPerformToggle.addEventListener('change', () => {
+      syncSelfPerformVisibility();
+      if (typeof mutateKickoff === 'function') {
+        mutateKickoff(k => {
+          k.projectInfo = k.projectInfo || {};
+          k.projectInfo.selfPerformEnabled = Boolean(selfPerformToggle.checked);
+        });
+      }
       if (typeof scheduleKickoffPdfPreview === 'function') scheduleKickoffPdfPreview(120);
     });
   }
@@ -171,7 +313,15 @@
     if (contingencyInput) contingencyInput.value = sanitizeContingencyPercent(info.contingencyPercent).replace(/\.$/, '');
     if (permittingInput) permittingInput.value = info.permittingInspectionsTesting || '';
     if (requirementsInput) requirementsInput.value = info.contractRequirements || '';
+    if (selfPerformToggle) selfPerformToggle.checked = Boolean(info.selfPerformEnabled);
+    if (selfPerformContingencyInput) selfPerformContingencyInput.value = sanitizeContingencyPercent(info.selfPerformContingencyPercent).replace(/\.$/, '');
+    if (selfPerformRevenueInput) selfPerformRevenueInput.value = info.selfPerformRevenue || '';
+    if (selfPerformProjectCostInput) selfPerformProjectCostInput.value = info.selfPerformProjectCost || '';
+    if (selfPerformGrossProfitInput) selfPerformGrossProfitInput.value = info.selfPerformGrossProfit || '';
     recalcGrossProfit();
+    recalcSelfPerformGrossProfit();
+    syncSelfPerformVisibility();
+    arrangeKickoffProjectInfoFields();
   }
 
   try {
