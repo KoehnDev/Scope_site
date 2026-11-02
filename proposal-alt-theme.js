@@ -56,7 +56,7 @@
   // Match Kickoff PDF preview controls and rendering speed to Proposal.
   if (!document.querySelector('script[data-kickoff-preview-controls]')) {
     const script = document.createElement('script');
-    script.src = 'kickoff-preview-controls.js?v=20261102-1';
+    script.src = 'kickoff-preview-controls.js?v=20261102-2';
     script.async = false;
     script.dataset.kickoffPreviewControls = 'true';
     script.onerror = () => console.error('Kickoff preview controls failed to load.');
