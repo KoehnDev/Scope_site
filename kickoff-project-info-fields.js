@@ -201,12 +201,12 @@
     .kickoff-project-details-grid>label.full{grid-column:auto}
     .kickoff-project-details-grid textarea{min-height:42px}
     .kickoff-project-financial-header{margin-top:8px}
-    .kickoff-project-financial-section{display:grid;grid-template-columns:minmax(150px,.34fr) minmax(0,1fr);gap:12px;border:1px solid #d9dde1;border-radius:10px;background:#fff;padding:14px}
+    .kickoff-project-financial-section{display:grid;grid-template-columns:1fr;gap:12px;border:1px solid #d9dde1;border-radius:10px;background:#fff;padding:14px}
     .kickoff-project-financial-section.hidden{display:none}
     .kickoff-project-financial-section .kickoff-project-section-header{grid-column:1/-1;margin:0 0 2px;padding-top:0}
-    .kickoff-project-contingency-field{grid-column:1/2;align-self:start}
+    .kickoff-project-contingency-field{grid-column:1/-1;align-self:start}
     .kickoff-project-contingency-field input{max-width:90px;justify-self:start;text-align:right}
-    .kickoff-project-financial-inner{grid-column:2/3}
+    .kickoff-project-financial-inner{grid-column:1/-1;width:auto}
     .kickoff-self-perform-toggle-row{display:flex;align-items:center;justify-content:space-between;gap:16px;border:1px solid #d9dde1;border-radius:10px;background:#fff;padding:12px 14px}
     .kickoff-self-perform-toggle-copy{display:flex;flex-direction:column;gap:2px}
     .kickoff-self-perform-toggle-copy strong{color:#555a60;font-size:12px}
