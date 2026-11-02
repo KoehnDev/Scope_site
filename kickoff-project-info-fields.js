@@ -10,6 +10,32 @@
   const kickoffFormCard = document.querySelector('#kickoffInfoTab .kickoff-form-card');
   const projectOverviewLabel = document.querySelector('[data-kickoff-info="projectOverview"]')?.closest('label');
 
+  // Use a controlled dropdown for kickoff contract type so projects use consistent terminology.
+  const contractTypeInput = document.querySelector('[data-kickoff-info="contractType"]');
+  if (contractTypeInput && contractTypeInput.tagName !== 'SELECT') {
+    const contractTypeSelect = document.createElement('select');
+    contractTypeSelect.dataset.kickoffInfo = 'contractType';
+    contractTypeSelect.setAttribute('aria-label','Contract Type');
+    [
+      ['', 'Select contract type'],
+      ['Lump Sum / Fixed Price', 'Lump Sum / Fixed Price'],
+      ['Guaranteed Maximum Price (GMP)', 'Guaranteed Maximum Price (GMP)'],
+      ['Cost Plus Fee', 'Cost Plus Fee'],
+      ['Time & Materials (T&M)', 'Time & Materials (T&M)'],
+      ['Unit Price', 'Unit Price']
+    ].forEach(([value,label]) => {
+      const option = document.createElement('option');
+      option.value = value;
+      option.textContent = label;
+      contractTypeSelect.appendChild(option);
+    });
+
+    // Migrate the legacy default wording used by existing kickoff projects.
+    const existing = String(contractTypeInput.value || '').trim();
+    contractTypeSelect.value = existing === 'Lump Sum' ? 'Lump Sum / Fixed Price' : existing;
+    contractTypeInput.replaceWith(contractTypeSelect);
+  }
+
   let gcProjectHeader = document.querySelector('.kickoff-gc-project-header');
   if (!gcProjectHeader) {
     gcProjectHeader = document.createElement('div');
