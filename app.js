@@ -1310,23 +1310,67 @@ function renderKickoffMapPreviews(){
   state.kickoffStreetPanorama=null;
   updateKickoffMapStatuses();
 }
-async function compressKickoffMapImage(file){
-  const source=await createImageBitmap(file);
+async function compressKickoffMapImage(file,{maxW=1200,maxH=800,quality=.78}={}){
+  const blob=file instanceof Blob?file:null;
+  if(!blob)throw new Error('No image was provided.');
+  if(!String(blob.type||'').startsWith('image/'))throw new Error('The clipboard item is not an image.');
+  let source=null;
   try{
-    const maxW=1600,maxH=1100,ratio=Math.min(1,maxW/source.width,maxH/source.height);
-    const w=Math.max(1,Math.round(source.width*ratio)),h=Math.max(1,Math.round(source.height*ratio));
+    source=await createImageBitmap(blob);
+  }catch(bitmapErr){
+    const url=URL.createObjectURL(blob);
+    try{
+      source=await new Promise((resolve,reject)=>{
+        const img=new Image();
+        img.onload=()=>resolve(img);
+        img.onerror=()=>reject(new Error('Could not read that screenshot.'));
+        img.src=url;
+      });
+    }finally{
+      setTimeout(()=>URL.revokeObjectURL(url),0);
+    }
+  }
+  try{
+    const sw=source.width||source.naturalWidth||1,sh=source.height||source.naturalHeight||1;
+    const ratio=Math.min(1,maxW/sw,maxH/sh);
+    const w=Math.max(1,Math.round(sw*ratio)),h=Math.max(1,Math.round(sh*ratio));
     const canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;
-    const ctx=canvas.getContext('2d',{alpha:false});ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h);ctx.drawImage(source,0,0,w,h);
-    return canvas.toDataURL('image/jpeg',.90);
-  }finally{source.close?.();}
+    const ctx=canvas.getContext('2d',{alpha:false});
+    if(!ctx)throw new Error('Could not prepare that screenshot.');
+    ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h);ctx.drawImage(source,0,0,w,h);
+    const data=canvas.toDataURL('image/jpeg',quality);
+    canvas.width=1;canvas.height=1;
+    return data;
+  }finally{
+    if(typeof source?.close==='function')source.close();
+  }
+}
+function isKickoffMapStorageLimitError(err){
+  const name=String(err?.name||'').toLowerCase();
+  const message=String(err?.message||err||'').toLowerCase();
+  return name.includes('quota')||message.includes('quota')||message.includes('storage')||message.includes('exceeded');
 }
 async function saveKickoffMapUpload(kind,file){
   if(!file)return;
+  const label=kind==='wide'?'Wide':kind==='close'?'Close-up':'Street View';
   try{
-    const data=await compressKickoffMapImage(file);
-    mutateKickoff(k=>{k.projectInfo=k.projectInfo||{};k.projectInfo.maps={wide:true,close:true,street:false,wideZoom:12,closeZoom:17,...(k.projectInfo.maps||{}),enabled:true};k.projectInfo.maps[kind]=true;k.projectInfo.maps[`${kind}Snapshot`]=data;});
-    renderKickoffMapPreviews();scheduleKickoffPdfPreview(180);toast(`${kind==='wide'?'Wide':kind==='close'?'Close-up':'Street View'} screenshot saved for PDF.`);
-  }catch(err){console.error(err);toast('Unable to save that map image.');}
+    let data=await compressKickoffMapImage(file);
+    try{
+      mutateKickoff(k=>{k.projectInfo=k.projectInfo||{};k.projectInfo.maps={wide:true,close:true,street:false,wideZoom:12,closeZoom:17,...(k.projectInfo.maps||{}),enabled:true};k.projectInfo.maps[kind]=true;k.projectInfo.maps[`${kind}Snapshot`]=data;});
+    }catch(saveErr){
+      if(!isKickoffMapStorageLimitError(saveErr))throw saveErr;
+      // Retry at a smaller size if this screenshot would exceed browser storage.
+      data=await compressKickoffMapImage(file,{maxW:900,maxH:600,quality:.68});
+      mutateKickoff(k=>{k.projectInfo=k.projectInfo||{};k.projectInfo.maps={wide:true,close:true,street:false,wideZoom:12,closeZoom:17,...(k.projectInfo.maps||{}),enabled:true};k.projectInfo.maps[kind]=true;k.projectInfo.maps[`${kind}Snapshot`]=data;});
+    }
+    renderKickoffMapPreviews();scheduleKickoffPdfPreview(180);toast(`${label} screenshot saved for PDF.`);
+  }catch(err){
+    console.error('Kickoff map screenshot save failed.',err);
+    const msg=isKickoffMapStorageLimitError(err)
+      ? 'Project image storage is full. Remove an unused map image or quote image, then try again.'
+      : (err?.message||'Unable to save that map image.');
+    toast(msg);
+  }
 }
 async function pasteKickoffMapScreenshot(kind){
   try{
