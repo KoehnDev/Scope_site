@@ -192,7 +192,7 @@
   // Load the additional Kickoff-only Project Information fields.
   if (!document.querySelector('script[data-kickoff-project-info-fields]')) {
     const script = document.createElement('script');
-    script.src = 'kickoff-project-info-fields.js?v=20261102-3';
+    script.src = 'kickoff-project-info-fields.js?v=20261102-4';
     script.async = false;
     script.dataset.kickoffProjectInfoFields = 'true';
     script.onerror = () => console.error('Kickoff project information fields failed to load.');
