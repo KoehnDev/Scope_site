@@ -60,7 +60,7 @@ const cloudProjectSyncTimers = new Map();
 const cloudSettingSyncTimers = new Map();
 let cloudWorkspacePromise = null;
 
-const state = { user: null, currentProjectId: null, currentProjectOwner: null, currentKickoffProjectId: null, currentKickoffOwner: null, currentKickoffTab: "info", kickoffQuoteTargetDivisionId: null, kickoffSaveTimer: null, kickoffPreviewTimer: null, kickoffPreviewToken: 0, kickoffPreviewRendering: false, kickoffPreviewPending: false, kickoffPreviewBlobUrl: null, authMode: "login", saveTimer: null, previewOpen: true, previewLastEditAt: 0, previewIdleMs: 1200, previewRenderTimer: null, previewRenderToken: 0, previewRendering: false, previewPending: false, previewBlobUrl: null, adminDisclaimerId: null, dashboardMode: "active", adminUserFilter: "all" };
+const state = { user: null, currentProjectId: null, currentProjectOwner: null, editorReady: false, currentKickoffProjectId: null, currentKickoffOwner: null, currentKickoffTab: "info", kickoffQuoteTargetDivisionId: null, kickoffSaveTimer: null, kickoffPreviewTimer: null, kickoffPreviewToken: 0, kickoffPreviewRendering: false, kickoffPreviewPending: false, kickoffPreviewBlobUrl: null, authMode: "login", saveTimer: null, previewOpen: true, previewLastEditAt: 0, previewIdleMs: 1200, previewRenderTimer: null, previewRenderToken: 0, previewRendering: false, previewPending: false, previewBlobUrl: null, adminDisclaimerId: null, dashboardMode: "active", adminUserFilter: "all" };
 const $ = (sel, root=document) => root.querySelector(sel);
 const $$ = (sel, root=document) => [...root.querySelectorAll(sel)];
 
@@ -755,7 +755,16 @@ function makeProject(name="Untitled Project", client="", projectNumber="", estim
 
 function toast(msg) { const el=$("#toast"); el.textContent=msg; el.classList.add("show"); clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove("show"),2200); }
 function setSaveStatus(text) { $("#saveStatus").textContent = text; }
-function scheduleSave() { setSaveStatus("Saving…"); clearTimeout(state.saveTimer); state.saveTimer=setTimeout(()=>{ saveEditorProject(); setSaveStatus("All changes saved"); },450); }
+function scheduleSave() {
+  if(!state.editorReady||!state.currentProjectId)return;
+  setSaveStatus("Saving…");
+  clearTimeout(state.saveTimer);
+  state.saveTimer=setTimeout(()=>{
+    if(!state.editorReady||!state.currentProjectId)return;
+    saveEditorProject();
+    if(state.editorReady)setSaveStatus("All changes saved");
+  },450);
+}
 function showAuth() { $("#authView").classList.remove("hidden"); $("#appView").classList.add("hidden"); }
 function showApp() { $("#authView").classList.add("hidden"); $("#appView").classList.remove("hidden"); }
 
@@ -1071,7 +1080,7 @@ function refreshRoleUi() {
   if (!admin && companyTabButton?.classList.contains("active")) activateTab("info");
 }
 function enterDashboard() {
-  showApp(); requestPersistentBrowserStorage(); state.currentProjectId=null; state.currentProjectOwner=null; state.currentKickoffProjectId=null; state.currentKickoffOwner=null;
+  showApp(); requestPersistentBrowserStorage(); state.editorReady=false; clearTimeout(state.saveTimer); state.currentProjectId=null; state.currentProjectOwner=null; state.currentKickoffProjectId=null; state.currentKickoffOwner=null;
   $("#dashboardView").classList.remove("hidden"); $("#editorView").classList.add("hidden"); $("#kickoffView").classList.add("hidden");
   $("#backToDashboard").classList.add("hidden"); $("#exportPdfBtn").classList.add("hidden");
   refreshRoleUi(); refreshDashboardNav(); renderProjects();
@@ -2244,13 +2253,36 @@ function handleNewProject(e) {
   const p=makeProject(name,$("#newClientName").value.trim(),$("#newProjectNumber").value.trim(),$("#newProjectOffice").value||"fredonia",$("#newProjectType").value||"standard"); state.currentProjectOwner=state.user.username; putProject(p,state.user.username); $("#newProjectDialog").close(); openProject(p.id,state.user.username);
 }
 function openProject(id, ownerUsername=state.user?.username) {
-  state.currentProjectId=id; state.currentProjectOwner=ownerUsername||state.user?.username; const p=getCurrentProject(); if (!p) return enterDashboard();
+  clearTimeout(state.saveTimer);
+  state.editorReady=false;
+  state.currentProjectId=id;
+  state.currentProjectOwner=ownerUsername||state.user?.username;
+  const p=getCurrentProject();
+  if(!p)return enterDashboard();
   $("#dashboardView").classList.add("hidden"); $("#kickoffView").classList.add("hidden"); $("#editorView").classList.remove("hidden"); $("#backToDashboard").classList.remove("hidden"); $("#exportPdfBtn").classList.remove("hidden");
   $("#projectTitleInline").value=p.projectName; $("#sidebarProjectName").textContent=p.projectName;
   $("#projectVersionBadge").textContent=versionLabel(p); $("#projectVersionBadge").classList.toggle("base",(p.version||0)===0);
   $("#projectOwnerBadge").textContent=ownerKey(state.currentProjectOwner)===ownerKey(state.user.username)?"":`Owner: ${state.currentProjectOwner}`;
   $("#projectOwnerBadge").classList.toggle("hidden",ownerKey(state.currentProjectOwner)===ownerKey(state.user.username));
-  renderDivisionUI(p); renderAlternateScopes(p); renderPriceItems(p); renderDisclaimerSelect(p); populateEditor(p); renderSummaryEditor(p); applyProjectLockUi(p); updateSelectedDisclaimerPreview(); updatePreview(); activateTab("info");
+  try{
+    renderDivisionUI(p);
+    renderAlternateScopes(p);
+    renderPriceItems(p);
+    renderDisclaimerSelect(p);
+    populateEditor(p);
+    renderSummaryEditor(p);
+    applyProjectLockUi(p);
+    updateSelectedDisclaimerPreview();
+    activateTab("info");
+    state.editorReady=true;
+    setSaveStatus("All changes saved");
+    updatePreview();
+  }catch(err){
+    state.editorReady=false;
+    console.error("Project editor failed to load completely. Auto-save is disabled to protect project data.",err);
+    setSaveStatus("Load error · saving disabled");
+    toast("This project did not load completely. Saving is disabled to protect its data.");
+  }
 }
 
 function applyProjectLockUi(p){
@@ -2634,6 +2666,7 @@ function populateEditor(p) {
   populateOfficeSettings();
 }
 function collectEditorProject() {
+  if(!state.editorReady)return null;
   const p=getCurrentProject(); if(!p)return null;
   const previousOffice=p.estimatingOffice||"fredonia";
   $$('[data-field]').forEach(el=>p[el.dataset.field]=el.value);
@@ -2649,7 +2682,14 @@ function collectEditorProject() {
   collectSummaryEditor(p);
   return p;
 }
-function saveEditorProject() { const current=getCurrentProject();if(!current)return;if(current.locked||current.deletedByUser){setSaveStatus(current.deletedByUser?"Deleted · recovery copy":"Locked · read only");return;}const p=collectEditorProject();if(!p)return;putProject(p,state.currentProjectOwner);$("#sidebarProjectName").textContent=p.projectName; }
+function saveEditorProject() {
+  if(!state.editorReady)return;
+  const current=getCurrentProject();if(!current)return;
+  if(current.locked||current.deletedByUser){setSaveStatus(current.deletedByUser?"Deleted · recovery copy":"Locked · read only");return;}
+  const p=collectEditorProject();if(!p)return;
+  putProject(p,state.currentProjectOwner);
+  $("#sidebarProjectName").textContent=p.projectName;
+}
 function activateTab(name) {
   if (name === "company" && !isAdmin()) name = "info";
   $$('.tab-btn').forEach(b=>b.classList.toggle('active',b.dataset.tab===name));
