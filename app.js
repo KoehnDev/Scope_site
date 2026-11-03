@@ -59,6 +59,8 @@ const cloudProfileIdByEmail = new Map();
 const cloudProjectSyncTimers = new Map();
 const cloudSettingSyncTimers = new Map();
 let cloudWorkspacePromise = null;
+let workspaceSessionData = null;
+let workspaceLocalCacheNoticeShown = false;
 
 const state = { user: null, currentProjectId: null, currentProjectOwner: null, editorReady: false, currentKickoffProjectId: null, currentKickoffOwner: null, currentKickoffTab: "info", kickoffQuoteTargetDivisionId: null, kickoffSaveTimer: null, kickoffPreviewTimer: null, kickoffPreviewToken: 0, kickoffPreviewRendering: false, kickoffPreviewPending: false, kickoffPreviewBlobUrl: null, authMode: "login", saveTimer: null, previewOpen: true, previewLastEditAt: 0, previewIdleMs: 1200, previewRenderTimer: null, previewRenderToken: 0, previewRendering: false, previewPending: false, previewBlobUrl: null, adminDisclaimerId: null, dashboardMode: "active", adminUserFilter: "all" };
 const $ = (sel, root=document) => root.querySelector(sel);
@@ -439,6 +441,9 @@ function blankDataStore() {
   return { schemaVersion: 1, updatedAt: nowIso(), users: {}, projects: {}, disclaimers: DEFAULT_DISCLAIMERS.map(x=>({...x})), officeSettings: normalizeOfficeSettings(), mapsSettings:{apiKey:""} };
 }
 function readDataStore() {
+  // Keep the full cloud workspace in memory for the active session. The
+  // browser's small localStorage quota is only a cache, not our database.
+  if(workspaceSessionData)return workspaceSessionData;
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
@@ -456,7 +461,57 @@ function readDataStore() {
 function writeDataStore(data) {
   data.schemaVersion = 1;
   data.updatedAt = nowIso();
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  // Always keep the full workspace in memory. Cloud projects can exceed the
+  // ~5 MiB per-origin browser storage quota, especially with map screenshots.
+  workspaceSessionData = data;
+  const canUseCloudCache=Boolean(authBackendConfigured&&authClient&&state.user?.username);
+  const fullJson=JSON.stringify(data);
+  const quotaError=err=>err?.name==="QuotaExceededError"||err?.code===22||err?.code===1014;
+  try{
+    // Avoid repeatedly attempting writes that cannot fit in localStorage.
+    if(canUseCloudCache&&fullJson.length>3_800_000){
+      const e=new Error("Cloud workspace is larger than the browser cache.");
+      e.name="QuotaExceededError";
+      throw e;
+    }
+    localStorage.setItem(STORAGE_KEY,fullJson);
+    return data;
+  }catch(err){
+    if(!canUseCloudCache||!quotaError(err))throw err;
+  }
+
+  // Only the signed-in employee's projects need a local cache. Other users'
+  // projects are still available in the full in-memory/admin cloud workspace.
+  // Never mutate or delete any project from the actual cloud dataset here.
+  const key=ownerKey(state.user.username);
+  const ownProjects=Array.isArray(data.projects?.[key])?data.projects[key]:[];
+  const cached={...data,projects:{[key]:ownProjects}};
+  try{
+    localStorage.setItem(STORAGE_KEY,JSON.stringify(cached));
+    if(!workspaceLocalCacheNoticeShown){
+      workspaceLocalCacheNoticeShown=true;
+      console.info("Cloud workspace exceeds browser cache; localStorage holds only the signed-in user's project copies.");
+    }
+    return data;
+  }catch(err){
+    if(!quotaError(err))throw err;
+  }
+
+  // A single owner's project data can also exceed the quota. Keep the newest
+  // project records in the local cache rather than failing the cloud login.
+  const newest=[...ownProjects].sort((a,b)=>(Date.parse(b.updatedAt||b.createdAt||0)||0)-(Date.parse(a.updatedAt||a.createdAt||0)||0));
+  for(let count=newest.length-1;count>=0;count--){
+    cached.projects[key]=newest.slice(0,count);
+    try{
+      localStorage.setItem(STORAGE_KEY,JSON.stringify(cached));
+      console.warn("Browser cache is limited; older projects will load from Supabase on sign-in.");
+      return data;
+    }catch(err){
+      if(!quotaError(err))throw err;
+    }
+  }
+  // Cloud data remains available in memory even on browsers that block storage.
+  console.warn("Could not update local project cache; cloud workspace remains available.");
   return data;
 }
 function migrateLegacyStorage() {
@@ -934,17 +989,27 @@ async function loadCloudWorkspace(){
       }
     }
     for(const key of Object.keys(data.users||{})){if(!activeEmails.has(key))delete data.users[key];}
+    const pendingCloudUpdates=[];
     for(const profile of profiles){
       const email=ownerKey(profile.email);if(!email)continue;
-      const merged=mergeCloudAndLocalProjects(data.projects[email]||[],grouped.get(profile.id)||[],profile.email);
-      data.projects[email]=merged;
+      const localProjects=data.projects[email]||[];
+      const cloudProjects=grouped.get(profile.id)||[];
+      const byId=new Map(cloudProjects.map(row=>[row.id,row]));
+      const pending=localProjects.filter(p=>{
+        const cloud=byId.get(p.id);
+        if(!cloud)return true;
+        const localTime=Date.parse(p.updatedAt||p.createdAt||0)||0;
+        const cloudTime=Date.parse(cloud.updated_at||cloud.project_data?.updatedAt||0)||0;
+        return localTime>cloudTime+1000;
+      });
+      if(pending.length)pendingCloudUpdates.push({email:profile.email,projects:pending});
+      data.projects[email]=mergeCloudAndLocalProjects(localProjects,cloudProjects,profile.email);
     }
+    // Don't blindly UPSERT all 51+ cloud projects on every sign-in. That
+    // creates unnecessary writes and recovery snapshots. Only push genuinely
+    // newer local records; preserve them before trimming the browser cache.
+    for(const pending of pendingCloudUpdates)await syncProjectsToCloudNow(pending.email,pending.projects);
     writeDataStore(data);
-    for(const profile of profiles){
-      const email=ownerKey(profile.email);if(!email)continue;
-      const merged=data.projects[email]||[];
-      if(merged.length||grouped.get(profile.id)?.length)await syncProjectsToCloudNow(profile.email,merged);
-    }
     await migrateLocalAssetsToCloud();
   })().finally(()=>{cloudWorkspacePromise=null;});
   return cloudWorkspacePromise;
