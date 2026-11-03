@@ -270,6 +270,7 @@
             <div class="editor-project-badges"><span id="projectVersionBadge" class="project-version-badge">Original</span><span id="projectLockBadge" class="project-lock-badge hidden">Locked · Read Only</span><span id="projectOwnerBadge" class="project-owner-badge hidden"></span></div>
           </div>
           <div class="editor-header-actions">
+            <button id="projectRecoveryBtn" class="btn btn-secondary" type="button">Recovery History</button>
             <button id="previewToggle" class="btn btn-secondary">PDF Preview</button>
           </div>
         </div>
@@ -513,6 +514,22 @@
         <button class="btn btn-primary" id="createProjectConfirm" value="default" type="submit">Create Project</button>
       </div>
     </form>
+  </dialog>
+
+  <dialog id="projectRecoveryDialog" class="modal recovery-history-modal">
+    <div class="modal-card recovery-history-card">
+      <div class="modal-header">
+        <div><span class="eyebrow">Project recovery</span><h2>Recovery History</h2></div>
+        <button id="closeProjectRecoveryDialog" class="icon-btn" type="button" aria-label="Close Recovery History">×</button>
+      </div>
+      <p class="recovery-history-intro">Scope Builder keeps the 10 most recent server-side recovery points for this project. Restoring a recovery point automatically preserves the current version first, so the restore itself can be undone.</p>
+      <div id="projectRecoveryProjectMeta" class="recovery-history-project-meta"></div>
+      <div id="projectRecoveryStatus" class="recovery-history-status">Loading recovery history…</div>
+      <div id="projectRecoveryList" class="recovery-history-list"></div>
+      <div class="modal-actions recovery-history-actions">
+        <button id="cancelProjectRecoveryDialog" class="btn btn-secondary" type="button">Close</button>
+      </div>
+    </div>
   </dialog>
 
   <dialog id="adminDialog" class="modal admin-modal">
