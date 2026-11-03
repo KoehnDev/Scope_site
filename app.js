@@ -2265,7 +2265,7 @@ function applyProjectLockUi(p){
   $$('#editorView .rich-division-editor, #editorView .rich-closeout-editor, #editorView .rich-alternate-editor').forEach(el=>el.setAttribute('contenteditable',locked?'false':'true'));
   const addAltScope=$('#addAlternateScopeBtn'); if(addAltScope)addAltScope.disabled=locked;
   $$('.alternate-delete-btn, .alternate-order-btn').forEach(b=>b.disabled=locked);
-  $('#editorView .scope-format-btn, #editorView .scope-font-color').forEach(el=>el.disabled=locked);
+  $$('#editorView .scope-format-btn, #editorView .scope-font-color').forEach(el=>el.disabled=locked);
   $("#addPriceItemBtn").disabled=locked;
   $$('.remove-price-item').forEach(b=>b.disabled=locked);
   const deleteBtn=$("#deleteProjectBtn");
@@ -2305,7 +2305,7 @@ function renderDivisionUI(p) {
       document.execCommand("insertText",false,text);
     });
   });
-  $(".scope-format-btn",cards).forEach(btn=>{
+  $$(".scope-format-btn",cards).forEach(btn=>{
     btn.addEventListener("mousedown",e=>e.preventDefault());
     btn.addEventListener("click",()=>{
       const card=btn.closest(".division-card"),editor=$(".rich-division-editor",card);
@@ -2316,7 +2316,7 @@ function renderDivisionUI(p) {
       editor.dispatchEvent(new Event("input",{bubbles:true}));
     });
   });
-  $(".scope-font-color",cards).forEach(input=>{
+  $$(".scope-font-color",cards).forEach(input=>{
     input.addEventListener("mousedown",()=>{const card=input.closest(".division-card"),editor=$(".rich-division-editor",card);input._scopeRange=scopeEditorSelection(editor);});
     input.addEventListener("change",()=>{const card=input.closest(".division-card"),editor=$(".rich-division-editor",card);applyScopeEditorColor(editor,input.value,input._scopeRange);input._scopeRange=null;});
   });
@@ -2362,11 +2362,11 @@ function renderAlternateScopes(p){
     });
     editor.addEventListener('paste',e=>{e.preventDefault();const html=e.clipboardData?.getData('text/html')||'',text=e.clipboardData?.getData('text/plain')||'';if(html){document.execCommand('insertHTML',false,sanitizeScopeHtml(html));}else document.execCommand('insertText',false,text);});
   });
-  $('.alt-format-btn',wrap).forEach(btn=>{
+  $$('.alt-format-btn',wrap).forEach(btn=>{
     btn.addEventListener('mousedown',e=>e.preventDefault());
     btn.addEventListener('click',()=>{const card=btn.closest('.alternate-scope-card'),editor=$('.rich-alternate-editor',card);if(!editor||editor.getAttribute('contenteditable')==='false')return;editor.focus();try{document.execCommand('styleWithCSS',false,false);}catch{}document.execCommand(btn.dataset.format,false,null);editor.dispatchEvent(new Event('input',{bubbles:true}));});
   });
-  $('.alt-font-color',wrap).forEach(input=>{
+  $$('.alt-font-color',wrap).forEach(input=>{
     input.addEventListener('mousedown',()=>{const card=input.closest('.alternate-scope-card'),editor=$('.rich-alternate-editor',card);input._scopeRange=scopeEditorSelection(editor);});
     input.addEventListener('change',()=>{const card=input.closest('.alternate-scope-card'),editor=$('.rich-alternate-editor',card);applyScopeEditorColor(editor,input.value,input._scopeRange);input._scopeRange=null;});
   });
