@@ -464,6 +464,14 @@ body { min-height: 100%; overflow-y: auto; }
 .scope-format-btn:focus-visible { outline: 2px solid var(--orange); outline-offset: 1px; }
 .scope-format-btn:disabled { opacity: .45; cursor: not-allowed; }
 .format-u { text-decoration: underline; text-underline-offset: 2px; font-weight: 700; }
+.format-s { text-decoration: line-through; font-weight: 700; }
+.scope-font-color { width: 30px; height: 28px; padding: 3px; border: 1px solid #d7dade; border-radius: 6px; background: #f8f9f9; cursor: pointer; }
+.scope-font-color:hover { border-color: #bfc3c7; background: #fff; }
+.scope-font-color:focus-visible { outline: 2px solid var(--orange); outline-offset: 1px; }
+.scope-font-color:disabled { opacity: .45; cursor: not-allowed; }
+.scope-font-color::-webkit-color-swatch-wrapper { padding: 0; }
+.scope-font-color::-webkit-color-swatch { border: 0; border-radius: 3px; }
+.scope-font-color::-moz-color-swatch { border: 0; border-radius: 3px; }
 .rich-division-editor { min-height: 180px; width: 100%; border: 1px solid #d8dbde; border-radius: 8px; background: #fff; padding: 11px 12px; font-family: inherit; font-size: 12px; line-height: 1.45; color: #272a2d; outline: none; white-space: pre-wrap; overflow-wrap: anywhere; }
 .rich-division-editor:focus { border-color: #aeb3b7; box-shadow: 0 0 0 2px rgba(243,111,33,.10); }
 .rich-division-editor:empty::before { content: attr(data-placeholder); color: #9da1a5; pointer-events: none; }
