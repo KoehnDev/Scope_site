@@ -74,6 +74,41 @@ function plainTextToRichHtml(text="") {
   if(!value)return "";
   return value.split("\n").map(line=>`<div>${esc(line)||"<br>"}</div>`).join("");
 }
+function normalizeScopeTextColor(value=""){
+  const raw=String(value||"").trim().toLowerCase();
+  if(!raw)return "";
+  const hex=raw.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+  if(hex){
+    const h=hex[1];
+    return h.length===3?`#${h.split("").map(ch=>ch+ch).join("")}`:`#${h}`;
+  }
+  const rgb=raw.match(/^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})(?:\s*,\s*[\d.]+)?\s*\)$/i);
+  if(rgb){
+    const parts=rgb.slice(1,4).map(n=>Math.max(0,Math.min(255,Number(n)||0)));
+    return "#"+parts.map(n=>Math.round(n).toString(16).padStart(2,"0")).join("");
+  }
+  return "";
+}
+function scopeEditorSelection(editor){
+  const sel=window.getSelection?.();
+  if(!editor||!sel?.rangeCount)return null;
+  const range=sel.getRangeAt(0);
+  return editor.contains(range.commonAncestorContainer)?range.cloneRange():null;
+}
+function restoreScopeEditorSelection(editor,range){
+  if(!editor||!range)return false;
+  try{
+    const sel=window.getSelection();sel.removeAllRanges();sel.addRange(range);editor.focus();return true;
+  }catch{return false;}
+}
+function applyScopeEditorColor(editor,color,range=null){
+  const safe=normalizeScopeTextColor(color);
+  if(!editor||!safe||editor.getAttribute("contenteditable")==="false")return;
+  if(range)restoreScopeEditorSelection(editor,range);else editor.focus();
+  try{document.execCommand("styleWithCSS",false,false);}catch{}
+  document.execCommand("foreColor",false,safe);
+  editor.dispatchEvent(new Event("input",{bubbles:true}));
+}
 function sanitizeScopeHtml(html="") {
   const source=document.createElement("div"); source.innerHTML=String(html||"");
   const out=document.createElement("div");
@@ -95,16 +130,23 @@ function sanitizeScopeHtml(html="") {
     }
     let target=parent;
     const wrappers=[];
+    let color="";
     if(tag==="b"||tag==="strong")wrappers.push("b");
     if(tag==="i"||tag==="em")wrappers.push("i");
     if(tag==="u")wrappers.push("u");
+    if(tag==="s"||tag==="strike")wrappers.push("s");
+    if(tag==="font")color=normalizeScopeTextColor(node.getAttribute("color")||"");
     if(tag==="span"){
       const st=(node.getAttribute("style")||"").toLowerCase();
       if(/font-weight\s*:\s*(bold|[6-9]00)/.test(st))wrappers.push("b");
       if(/font-style\s*:\s*italic/.test(st))wrappers.push("i");
       if(/text-decoration[^;]*underline/.test(st))wrappers.push("u");
+      if(/text-decoration[^;]*line-through/.test(st))wrappers.push("s");
+      const colorMatch=st.match(/(?:^|;)\s*color\s*:\s*([^;]+)/);
+      if(colorMatch)color=normalizeScopeTextColor(colorMatch[1]);
     }
     wrappers.forEach(w=>{const el=document.createElement(w);target.appendChild(el);target=el;});
+    if(color){const span=document.createElement("span");span.style.color=color;target.appendChild(span);target=span;}
     [...node.childNodes].forEach(ch=>copy(ch,target));
   };
   [...source.childNodes].forEach(n=>copy(n,out));
@@ -2183,7 +2225,7 @@ function applyProjectLockUi(p){
   $$('#editorView .rich-division-editor, #editorView .rich-closeout-editor, #editorView .rich-alternate-editor').forEach(el=>el.setAttribute('contenteditable',locked?'false':'true'));
   const addAltScope=$('#addAlternateScopeBtn'); if(addAltScope)addAltScope.disabled=locked;
   $$('.alternate-delete-btn, .alternate-order-btn').forEach(b=>b.disabled=locked);
-  $$('#editorView .scope-format-btn').forEach(el=>el.disabled=locked);
+  $('#editorView .scope-format-btn, #editorView .scope-font-color').forEach(el=>el.disabled=locked);
   $("#addPriceItemBtn").disabled=locked;
   $$('.remove-price-item').forEach(b=>b.disabled=locked);
   const deleteBtn=$("#deleteProjectBtn");
@@ -2203,7 +2245,7 @@ function renderDivisionUI(p) {
     const rich=normalizedDivisionRichHtml(d);
     const lineCount=plain?plain.split(/\n/).length:0;
     const card=document.createElement("article"); card.className=`division-card ${d.enabled?'enabled':''}`; card.dataset.division=n;
-    card.innerHTML=`<div class="division-card-header"><div class="div-badge">${n}</div><div class="division-title-wrap"><div class="div-title-row"><span class="div-title-prefix">Division ${n} –</span><input class="division-title-input" value="${esc(title)}" aria-label="Division ${n} name" title="Edit division name only"></div><div class="div-sub">${lineCount?`${lineCount} scope line${lineCount===1?'':'s'} entered`:'No scope entered'}</div></div><label class="switch-label"><input type="checkbox" class="division-enabled" ${d.enabled?'checked':''}><span class="switch"></span>Include</label><button class="division-expand" aria-label="Expand division">⌄</button></div><div class="division-body"><div class="division-format-toolbar" role="toolbar" aria-label="Division ${n} text formatting"><button type="button" class="scope-format-btn" data-format="bold" title="Bold (Ctrl+B)" aria-label="Bold"><strong>B</strong></button><button type="button" class="scope-format-btn" data-format="italic" title="Italic (Ctrl+I)" aria-label="Italic"><em>I</em></button><button type="button" class="scope-format-btn" data-format="underline" title="Underline (Ctrl+U)" aria-label="Underline"><span class="format-u">U</span></button></div><div class="division-text rich-division-editor" contenteditable="true" role="textbox" aria-multiline="true" spellcheck="true" data-placeholder="Paste or type Division ${n} scope here…">${rich}</div><div class="paste-helper"><span>Tip: each normal manual new line becomes a PDF bullet. Blank lines and intentionally indented lines keep their layout. Select text to use Bold, Italic, or Underline.</span><span>Auto-saved</span></div></div>`;
+    card.innerHTML=`<div class="division-card-header"><div class="div-badge">${n}</div><div class="division-title-wrap"><div class="div-title-row"><span class="div-title-prefix">Division ${n} –</span><input class="division-title-input" value="${esc(title)}" aria-label="Division ${n} name" title="Edit division name only"></div><div class="div-sub">${lineCount?`${lineCount} scope line${lineCount===1?'':'s'} entered`:'No scope entered'}</div></div><label class="switch-label"><input type="checkbox" class="division-enabled" ${d.enabled?'checked':''}><span class="switch"></span>Include</label><button class="division-expand" aria-label="Expand division">⌄</button></div><div class="division-body"><div class="division-format-toolbar" role="toolbar" aria-label="Division ${n} text formatting"><button type="button" class="scope-format-btn" data-format="bold" title="Bold (Ctrl+B)" aria-label="Bold"><strong>B</strong></button><button type="button" class="scope-format-btn" data-format="italic" title="Italic (Ctrl+I)" aria-label="Italic"><em>I</em></button><button type="button" class="scope-format-btn" data-format="underline" title="Underline (Ctrl+U)" aria-label="Underline"><span class="format-u">U</span></button><button type="button" class="scope-format-btn" data-format="strikeThrough" title="Strikethrough" aria-label="Strikethrough"><span class="format-s">S</span></button><input type="color" class="scope-font-color" value="#1c1e20" title="Font color" aria-label="Font color"></div><div class="division-text rich-division-editor" contenteditable="true" role="textbox" aria-multiline="true" spellcheck="true" data-placeholder="Paste or type Division ${n} scope here…">${rich}</div><div class="paste-helper"><span>Tip: each normal manual new line becomes a PDF bullet. Blank lines and intentionally indented lines keep their layout. Select text to use Bold, Italic, Underline, Strikethrough, or Font Color.</span><span>Auto-saved</span></div></div>`;
     cards.appendChild(card);
     const navBtn=document.createElement("button"); navBtn.className="division-nav-item"; navBtn.dataset.navDivision=n; navBtn.innerHTML=`<span class="division-nav-number">${n}</span><span class="division-nav-title">${esc(title)}</span><span class="division-nav-dot ${plain?'used':''}"></span>`; nav.appendChild(navBtn);
   });
@@ -2223,7 +2265,7 @@ function renderDivisionUI(p) {
       document.execCommand("insertText",false,text);
     });
   });
-  $$(".scope-format-btn",cards).forEach(btn=>{
+  $(".scope-format-btn",cards).forEach(btn=>{
     btn.addEventListener("mousedown",e=>e.preventDefault());
     btn.addEventListener("click",()=>{
       const card=btn.closest(".division-card"),editor=$(".rich-division-editor",card);
@@ -2233,6 +2275,10 @@ function renderDivisionUI(p) {
       document.execCommand(btn.dataset.format,false,null);
       editor.dispatchEvent(new Event("input",{bubbles:true}));
     });
+  });
+  $(".scope-font-color",cards).forEach(input=>{
+    input.addEventListener("mousedown",()=>{const card=input.closest(".division-card"),editor=$(".rich-division-editor",card);input._scopeRange=scopeEditorSelection(editor);});
+    input.addEventListener("change",()=>{const card=input.closest(".division-card"),editor=$(".rich-division-editor",card);applyScopeEditorColor(editor,input.value,input._scopeRange);input._scopeRange=null;});
   });
   $$('[data-nav-division]').forEach(btn=>btn.addEventListener('click',()=>{ activateTab("scope"); const card=$(`[data-division="${btn.dataset.navDivision}"]`);card.classList.add('open');card.scrollIntoView({behavior:'smooth',block:'center'}); }));
   filterDivisionNav();
@@ -2258,9 +2304,9 @@ function renderAlternateScopes(p){
       <button type="button" class="alternate-delete-btn" title="Delete alternate">×</button>
     </div>
     <div class="alternate-scope-card-body">
-      <div class="division-format-toolbar" role="toolbar" aria-label="Alternate text formatting"><button type="button" class="scope-format-btn alt-format-btn" data-format="bold" title="Bold (Ctrl+B)"><strong>B</strong></button><button type="button" class="scope-format-btn alt-format-btn" data-format="italic" title="Italic (Ctrl+I)"><em>I</em></button><button type="button" class="scope-format-btn alt-format-btn" data-format="underline" title="Underline (Ctrl+U)"><span class="format-u">U</span></button></div>
+      <div class="division-format-toolbar" role="toolbar" aria-label="Alternate text formatting"><button type="button" class="scope-format-btn alt-format-btn" data-format="bold" title="Bold (Ctrl+B)"><strong>B</strong></button><button type="button" class="scope-format-btn alt-format-btn" data-format="italic" title="Italic (Ctrl+I)"><em>I</em></button><button type="button" class="scope-format-btn alt-format-btn" data-format="underline" title="Underline (Ctrl+U)"><span class="format-u">U</span></button><button type="button" class="scope-format-btn alt-format-btn" data-format="strikeThrough" title="Strikethrough"><span class="format-s">S</span></button><input type="color" class="scope-font-color alt-font-color" value="#1c1e20" title="Font color" aria-label="Font color"></div>
       <div class="rich-alternate-editor" contenteditable="true" role="textbox" aria-multiline="true" spellcheck="true" data-placeholder="Enter the scope for this alternate…">${sanitizeScopeHtml(a.richText||plainTextToRichHtml(a.text||""))}</div>
-      <div class="paste-helper"><span>Each alternate prints in its own proposal box. Manual line breaks, blank lines, indentation, and B/I/U formatting are preserved.</span><span>Auto-saved</span></div>
+      <div class="paste-helper"><span>Each alternate prints in its own proposal box. Manual line breaks, blank lines, indentation, B/I/U, strikethrough, and font color are preserved.</span><span>Auto-saved</span></div>
     </div>`;
     wrap.appendChild(card);
   });
@@ -2276,9 +2322,13 @@ function renderAlternateScopes(p){
     });
     editor.addEventListener('paste',e=>{e.preventDefault();const html=e.clipboardData?.getData('text/html')||'',text=e.clipboardData?.getData('text/plain')||'';if(html){document.execCommand('insertHTML',false,sanitizeScopeHtml(html));}else document.execCommand('insertText',false,text);});
   });
-  $$('.alt-format-btn',wrap).forEach(btn=>{
+  $('.alt-format-btn',wrap).forEach(btn=>{
     btn.addEventListener('mousedown',e=>e.preventDefault());
     btn.addEventListener('click',()=>{const card=btn.closest('.alternate-scope-card'),editor=$('.rich-alternate-editor',card);if(!editor||editor.getAttribute('contenteditable')==='false')return;editor.focus();try{document.execCommand('styleWithCSS',false,false);}catch{}document.execCommand(btn.dataset.format,false,null);editor.dispatchEvent(new Event('input',{bubbles:true}));});
+  });
+  $('.alt-font-color',wrap).forEach(input=>{
+    input.addEventListener('mousedown',()=>{const card=input.closest('.alternate-scope-card'),editor=$('.rich-alternate-editor',card);input._scopeRange=scopeEditorSelection(editor);});
+    input.addEventListener('change',()=>{const card=input.closest('.alternate-scope-card'),editor=$('.rich-alternate-editor',card);applyScopeEditorColor(editor,input.value,input._scopeRange);input._scopeRange=null;});
   });
   $$('[data-alt-move]',wrap).forEach(btn=>btn.addEventListener('click',()=>{
     const card=btn.closest('.alternate-scope-card'),cards=$$('.alternate-scope-card',wrap),idx=cards.indexOf(card),dir=btn.dataset.altMove==='up'?-1:1,target=idx+dir;
@@ -2711,10 +2761,10 @@ function scopeItemsFromRichHtml(html="",fallbackText="") {
   const addText=(value,style)=>{
     String(value||"").split(/\n/).forEach((part,index)=>{
       if(index)lineBreak();
-      if(part)lines[lines.length-1].push({text:part,bold:Boolean(style.bold),italic:Boolean(style.italic),underline:Boolean(style.underline)});
+      if(part)lines[lines.length-1].push({text:part,bold:Boolean(style.bold),italic:Boolean(style.italic),underline:Boolean(style.underline),strike:Boolean(style.strike),color:normalizeScopeTextColor(style.color||"")});
     });
   };
-  const walk=(node,style={bold:false,italic:false,underline:false})=>{
+  const walk=(node,style={bold:false,italic:false,underline:false,strike:false,color:""})=>{
     if(node.nodeType===Node.TEXT_NODE){addText(node.nodeValue,style);return;}
     if(node.nodeType!==Node.ELEMENT_NODE)return;
     const tag=node.tagName.toLowerCase();
@@ -2723,6 +2773,8 @@ function scopeItemsFromRichHtml(html="",fallbackText="") {
     if(tag==="b"||tag==="strong")next.bold=true;
     if(tag==="i"||tag==="em")next.italic=true;
     if(tag==="u")next.underline=true;
+    if(tag==="s"||tag==="strike")next.strike=true;
+    if(tag==="span"){const parsed=normalizeScopeTextColor(node.style?.color||"");if(parsed)next.color=parsed;}
     if(tag==="div"||tag==="p"){
       if(lines[lines.length-1].length)lineBreak();
       [...node.childNodes].forEach(ch=>walk(ch,next));
@@ -2737,7 +2789,7 @@ function scopeItemsFromRichHtml(html="",fallbackText="") {
     runs.forEach(run=>{
       if(!run.text)return;
       const prev=out[out.length-1];
-      if(prev&&prev.bold===run.bold&&prev.italic===run.italic&&prev.underline===run.underline)prev.text+=run.text;
+      if(prev&&prev.bold===run.bold&&prev.italic===run.italic&&prev.underline===run.underline&&prev.strike===run.strike&&prev.color===run.color)prev.text+=run.text;
       else out.push({...run});
     });
     return out;
@@ -3197,10 +3249,12 @@ async function exportPdf(options={}) {
     lines.forEach((line,lineIndex)=>{
       let cx=x,baseline=y+lineIndex*leading;
       line.forEach(run=>{
-        doc.setFont('helvetica',runFontStyle(run));doc.setFontSize(fontSize);setText(text);
+        doc.setFont('helvetica',runFontStyle(run));doc.setFontSize(fontSize);
+        const runColor=run.color?hexToRgb(run.color):text;setText(runColor);
         doc.text(run.text,cx,baseline);
         const w=doc.getTextWidth(run.text);
-        if(run.underline&&run.text.trim()){doc.setDrawColor(...text);doc.setLineWidth(.008);doc.line(cx,baseline+.025,cx+w,baseline+.025);}
+        if(run.underline&&run.text.trim()){doc.setDrawColor(...runColor);doc.setLineWidth(.008);doc.line(cx,baseline+.025,cx+w,baseline+.025);}
+        if(run.strike&&run.text.trim()){doc.setDrawColor(...runColor);doc.setLineWidth(.008);doc.line(cx,baseline-(fontSize/72)*.27,cx+w,baseline-(fontSize/72)*.27);}
         cx+=w;
       });
     });
@@ -3735,6 +3789,8 @@ closeoutTab.addEventListener("input",e=>{if(e.target.matches('.rich-closeout-edi
 closeoutTab.addEventListener("paste",e=>{if(!e.target.matches('.rich-closeout-editor'))return;e.preventDefault();const text=e.clipboardData?.getData("text/plain")||"";document.execCommand("insertText",false,text);});
 closeoutTab.addEventListener("mousedown",e=>{const btn=e.target.closest('.scope-format-btn');if(btn)e.preventDefault();});
 closeoutTab.addEventListener("click",e=>{const btn=e.target.closest('.scope-format-btn');if(!btn)return;const card=btn.closest('.text-section-card'),editor=$('.rich-closeout-editor',card);if(!editor||editor.getAttribute('contenteditable')==='false')return;editor.focus();try{document.execCommand("styleWithCSS",false,false);}catch{}document.execCommand(btn.dataset.format,false,null);editor.dispatchEvent(new Event("input",{bubbles:true}));});
+closeoutTab.addEventListener("mousedown",e=>{const input=e.target.closest('.scope-font-color');if(!input)return;const card=input.closest('.text-section-card'),editor=$('.rich-closeout-editor',card);input._scopeRange=scopeEditorSelection(editor);});
+closeoutTab.addEventListener("change",e=>{const input=e.target.closest('.scope-font-color');if(!input)return;const card=input.closest('.text-section-card'),editor=$('.rich-closeout-editor',card);applyScopeEditorColor(editor,input.value,input._scopeRange);input._scopeRange=null;});
 $("#priceItems").addEventListener("click",e=>{const b=e.target.closest('.remove-price-item');if(!b)return;const row=b.closest('.price-item-row');row.remove();const base=$('.base-bid-row');if(base)base.classList.toggle('has-alternates',$$('.price-item-row:not(.base-bid-row)').length>0);$("#emptyPriceItems").classList.toggle("hidden",$$('.price-item-row').length>0);scheduleSave();updatePreview();});
 $("#projectDisclaimerSelect").addEventListener("change",()=>{updateSelectedDisclaimerPreview();scheduleSave();updatePreview();});
 document.addEventListener("input",e=>{
