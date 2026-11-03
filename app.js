@@ -952,7 +952,194 @@ async function loadCloudWorkspace(){
 async function refreshDashboardFromCloud(){
   if(!authBackendConfigured||!authClient||!state.user)return;
   try{await loadCloudWorkspace();refreshDashboardNav();renderProjects();}
-  catch(err){console.error('Cloud workspace load failed.',err);toast('Could not load the shared cloud workspace. Local projects are still available.');}
+  catch(err){console.error("Cloud workspace load failed.",err);toast("Could not load the shared cloud workspace. Local projects are still available.");}
+}
+
+function recoverySnapshotDetails(row){
+  const snap=row?.snapshot_data||{};
+  const p=snap.project_data||{};
+  const priceItems=Array.isArray(p.priceItems)?p.priceItems:[];
+  const alternates=Array.isArray(p.alternateScopes)?p.alternateScopes:[];
+  const divisions=p.divisions&&typeof p.divisions==="object"?Object.values(p.divisions):[];
+  const enabledDivisions=divisions.filter(d=>d?.enabled).length;
+  const base=priceItems.find(x=>x?.isBaseBid)||priceItems[0];
+  return {
+    projectName:row?.project_name||snap.project_name||p.projectName||"Untitled Project",
+    clientName:row?.client_name||snap.client_name||p.clientName||"",
+    projectNumber:row?.project_number||snap.project_number||p.projectNumber||"",
+    priceCount:priceItems.length,
+    alternateCount:alternates.length,
+    enabledDivisions,
+    basePrice:String(base?.price||"").trim()
+  };
+}
+function formatRecoveryTimestamp(value){
+  const d=new Date(value);
+  if(Number.isNaN(d.getTime()))return "Unknown time";
+  return d.toLocaleString(undefined,{month:"short",day:"numeric",year:"numeric",hour:"numeric",minute:"2-digit"});
+}
+function recoveryActionLabel(action){
+  if(action==="baseline")return "Baseline";
+  if(action==="delete")return "Before Delete";
+  return "Previous Save";
+}
+function renderProjectRecoveryHistory(rows=[]){
+  const list=$("#projectRecoveryList"),status=$("#projectRecoveryStatus");
+  if(!list||!status)return;
+  list.innerHTML="";
+  if(!rows.length){
+    status.textContent="No recovery points are available yet.";
+    status.classList.remove("hidden");
+    return;
+  }
+  status.classList.add("hidden");
+  rows.forEach((row,index)=>{
+    const details=recoverySnapshotDetails(row);
+    const card=document.createElement("article");
+    card.className="recovery-history-item";
+    const head=document.createElement("div");
+    head.className="recovery-history-item-main";
+    const itemHead=document.createElement("div");
+    itemHead.className="recovery-history-item-head";
+    const badge=document.createElement("span");
+    badge.className="recovery-history-badge"+(row.action==="baseline"?" baseline":"");
+    badge.textContent=recoveryActionLabel(row.action);
+    const time=document.createElement("strong");
+    time.textContent=formatRecoveryTimestamp(row.created_at);
+    itemHead.append(badge,time);
+    if(index===0){
+      const newest=document.createElement("span");
+      newest.className="recovery-history-newest";
+      newest.textContent="Newest recovery point";
+      itemHead.appendChild(newest);
+    }
+    const title=document.createElement("div");
+    title.className="recovery-history-item-title";
+    title.textContent=details.projectName;
+    const sub=document.createElement("div");
+    sub.className="recovery-history-item-sub";
+    sub.textContent=(details.clientName||"No client")+(details.projectNumber?" • "+details.projectNumber:"");
+    const stats=document.createElement("div");
+    stats.className="recovery-history-stats";
+    const statValues=[
+      details.basePrice?"Base Bid "+details.basePrice:"Base Bid not saved",
+      details.alternateCount+" alternate"+(details.alternateCount===1?"":"s"),
+      details.enabledDivisions+" enabled division"+(details.enabledDivisions===1?"":"s")
+    ];
+    statValues.forEach(value=>{const span=document.createElement("span");span.textContent=value;stats.appendChild(span);});
+    head.append(itemHead,title,sub,stats);
+    const restore=document.createElement("button");
+    restore.className="btn btn-secondary recovery-restore-btn";
+    restore.type="button";
+    restore.dataset.recoveryId=row.id;
+    restore.textContent="Restore";
+    card.append(head,restore);
+    list.appendChild(card);
+  });
+}
+async function openProjectRecoveryHistory(){
+  const p=getCurrentProject();
+  if(!p)return;
+  if(!authBackendConfigured||!authClient){
+    toast("Recovery History is available when connected to the company cloud workspace.");
+    return;
+  }
+  const dialog=$("#projectRecoveryDialog"),status=$("#projectRecoveryStatus"),list=$("#projectRecoveryList"),meta=$("#projectRecoveryProjectMeta");
+  if(!dialog||!status||!list)return;
+  meta.textContent=[p.projectName,p.projectNumber,p.clientName].filter(Boolean).join(" • ");
+  status.textContent="Loading recovery history…";
+  status.classList.remove("hidden");
+  list.innerHTML="";
+  if(!dialog.open)dialog.showModal();
+  try{
+    const {data,error}=await authClient
+      .from("project_recovery_snapshots")
+      .select("id,project_id,family_id,owner_id,action,project_name,project_number,client_name,version_label,workflow_status,snapshot_data,created_at")
+      .eq("project_id",p.id)
+      .order("created_at",{ascending:false})
+      .limit(10);
+    if(error)throw error;
+    renderProjectRecoveryHistory(data||[]);
+  }catch(err){
+    console.error("Could not load project recovery history.",err);
+    status.textContent="Recovery history could not be loaded.";
+    status.classList.remove("hidden");
+  }
+}
+function replaceLocalProjectWithoutCloudSync(ownerUsername,project){
+  if(!ownerUsername||!project)return;
+  const key=ownerKey(ownerUsername),data=readDataStore();
+  const list=(data.projects[key]||[]).map(p=>normalizeProject(p,ownerUsername));
+  const idx=list.findIndex(p=>p.id===project.id);
+  if(idx>=0)list[idx]=normalizeProject(project,ownerUsername);
+  else list.unshift(normalizeProject(project,ownerUsername));
+  data.projects[key]=list;
+  writeDataStore(data);
+}
+async function restoreProjectRecoverySnapshot(snapshotId){
+  const current=getCurrentProject();
+  const ownerUsername=state.currentProjectOwner||state.user?.username;
+  if(!current||!snapshotId||!ownerUsername||!authClient)return;
+  const ok=confirm("Restore this recovery point?\n\nThe current project state will be preserved automatically first, so you can undo this restore from Recovery History.");
+  if(!ok)return;
+  const buttons=$(".recovery-restore-btn");
+  buttons.forEach(b=>b.disabled=true);
+  try{
+    const {data:row,error}=await authClient
+      .from("project_recovery_snapshots")
+      .select("id,project_id,family_id,owner_id,action,project_name,project_number,client_name,version_label,workflow_status,snapshot_data,created_at")
+      .eq("id",snapshotId)
+      .eq("project_id",current.id)
+      .single();
+    if(error)throw error;
+    const snap=row?.snapshot_data||{};
+    const raw=cloneJson(snap.project_data||{});
+    const restoredAt=nowIso();
+    const restored=normalizeProject({
+      ...raw,
+      id:current.id,
+      familyId:snap.family_id||raw.familyId||current.familyId||current.id,
+      projectName:snap.project_name??row.project_name??raw.projectName??current.projectName,
+      projectNumber:snap.project_number??row.project_number??raw.projectNumber??"",
+      clientName:snap.client_name??row.client_name??raw.clientName??"",
+      ownerUsername,
+      updatedAt:restoredAt
+    },ownerUsername);
+    restored.updatedAt=restoredAt;
+
+    const ownerId=await resolveCloudOwnerId(ownerUsername);
+    if(!ownerId)throw new Error("Could not identify the project owner.");
+    const cloudRow=cloudProjectRow(restored,ownerId,ownerUsername);
+    cloudRow.updated_at=restoredAt;
+    cloudRow.project_data={...cloudRow.project_data,updatedAt:restoredAt};
+
+    const {error:updateError}=await authClient
+      .from("projects")
+      .update({
+        family_id:cloudRow.family_id,
+        project_name:cloudRow.project_name,
+        project_number:cloudRow.project_number,
+        client_name:cloudRow.client_name,
+        version_label:cloudRow.version_label,
+        workflow_status:cloudRow.workflow_status,
+        project_data:cloudRow.project_data,
+        created_at:cloudRow.created_at,
+        updated_at:cloudRow.updated_at,
+        deleted_at:cloudRow.deleted_at
+      })
+      .eq("id",current.id)
+      .eq("owner_id",ownerId);
+    if(updateError)throw updateError;
+
+    replaceLocalProjectWithoutCloudSync(ownerUsername,cloudRow.project_data);
+    $("#projectRecoveryDialog")?.close();
+    openProject(current.id,ownerUsername);
+    toast("Project restored. The replaced version is available in Recovery History.");
+  }catch(err){
+    console.error("Project recovery restore failed.",err);
+    toast(err?.message||"Could not restore that recovery point.");
+    buttons.forEach(b=>b.disabled=false);
+  }
 }
 
 async function hydrateRemoteUser(session){
@@ -3847,6 +4034,11 @@ $("#kickoffCloseMapEnabled")?.addEventListener('change',()=>{saveKickoffInfoFrom
 $("#kickoffStreetMapEnabled")?.addEventListener('change',()=>{saveKickoffInfoFromForm();renderKickoffMapPreviews();scheduleKickoffPdfPreview(220);});
 $$('[data-kickoff-info]').forEach(el=>{el.addEventListener('input',()=>scheduleKickoffSave());el.addEventListener('change',()=>{saveKickoffInfoFromForm();if(el.dataset.kickoffInfo==='projectLocation')renderKickoffMapPreviews();});});
 $("#backToDashboard").addEventListener("click",()=>{saveEditorProject();enterDashboard();});$("#sidebarBack").addEventListener("click",()=>{saveEditorProject();enterDashboard();});$("#kickoffBackBtn").addEventListener("click",()=>{saveKickoffInfoFromForm();if(document.querySelector('.kickoff-division-card'))collectKickoffDivisionsFromDom();enterDashboard();});$("#exportPdfBtn").addEventListener("click",exportPdf);$("#deleteProjectBtn").addEventListener("click",handleVersionDeleteRestore);
+$("#projectRecoveryBtn")?.addEventListener("click",openProjectRecoveryHistory);
+$("#closeProjectRecoveryDialog")?.addEventListener("click",()=>$("#projectRecoveryDialog")?.close());
+$("#cancelProjectRecoveryDialog")?.addEventListener("click",()=>$("#projectRecoveryDialog")?.close());
+$("#projectRecoveryDialog")?.addEventListener("click",e=>{if(e.target===$("#projectRecoveryDialog"))$("#projectRecoveryDialog").close();});
+$("#projectRecoveryList")?.addEventListener("click",e=>{const btn=e.target.closest(".recovery-restore-btn");if(btn)restoreProjectRecoverySnapshot(btn.dataset.recoveryId);});
 $("#divisionSearch").addEventListener("input",filterDivisionNav);$("#expandAllBtn").addEventListener("click",()=>$$('.division-card').forEach(c=>c.classList.add('open')));$("#collapseAllBtn").addEventListener("click",()=>$$('.division-card').forEach(c=>c.classList.remove('open')));
 $("#previewToggle").addEventListener("click",()=>togglePreview());$("#closePreviewBtn").addEventListener("click",()=>togglePreview(false));$$('.tab-btn').forEach(b=>b.addEventListener('click',()=>activateTab(b.dataset.tab)));
 $("#projectTitleInline").addEventListener("input",()=>{scheduleSave();updatePreview();});$("#addPriceItemBtn").addEventListener("click",addPriceItem);$("#importAlternatePricesBtn")?.addEventListener("click",importAlternatePriceItems);
