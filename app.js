@@ -2117,20 +2117,60 @@ async function importKoehnProjectArchive(file){
     const originalOwner=String(payload.ownerUsername||"");
     let targetOwner=state.user.username;
     if(isAdmin()&&originalOwner&&getUserRecord(originalOwner))targetOwner=originalOwner;
-    const incoming=payload.projects.map(raw=>normalizeProject({...raw,ownerUsername:targetOwner,archived:false},targetOwner));
+
+    // An archive restore is an intentional authoritative restore. Preserve the
+    // archived project data, but give every restored version a fresh updatedAt
+    // so an older/stale cloud row cannot immediately overwrite it after import.
+    const importedAt=nowIso();
+    const incoming=payload.projects.map(raw=>normalizeProject({
+      ...cloneJson(raw),
+      ownerUsername:targetOwner,
+      archived:false,
+      archiveImportedAt:importedAt,
+      archiveOriginalUpdatedAt:raw?.updatedAt||raw?.createdAt||null,
+      updatedAt:importedAt
+    },targetOwner));
+
     const familyId=incoming[0]?.familyId||incoming[0]?.id; if(!familyId)throw new Error("Archive has no project family ID.");
     let existing=getProjectsForUser(targetOwner,{includeDeleted:true});
     const collision=existing.some(p=>(p.familyId||p.id)===familyId);
     if(collision&&!confirm("This project already exists in the workspace. Replace the existing copy with the archived copy?"))return;
-    if(collision){existing=existing.filter(p=>(p.familyId||p.id)!==familyId);await deleteFamilyQuoteAssets(familyId);}
-    (payload.termsAndConditions||[]).forEach(term=>{if(term?.id&&!getDisclaimers().some(d=>d.id===term.id)){const allTerms=getDisclaimers();allTerms.push(term);saveDisclaimers(allTerms);}});
-    saveProjectsForUser(targetOwner,[...incoming,...existing]);
+
+    if(collision){
+      existing=existing.filter(p=>(p.familyId||p.id)!==familyId);
+      await deleteFamilyQuoteAssets(familyId);
+    }
+
+    // Remove any cloud copy before restoring so a newer-but-stale row cannot
+    // win the cloud/local merge and blank fields from the archive.
+    if(authBackendConfigured&&authClient){
+      try{await deleteCloudProjectFamily(targetOwner,familyId);}
+      catch(err){console.warn("Could not clear the prior cloud project before archive restore.",err);}
+    }
+
+    (payload.termsAndConditions||[]).forEach(term=>{
+      if(term?.id&&!getDisclaimers().some(d=>d.id===term.id)){
+        const allTerms=getDisclaimers();allTerms.push(term);saveDisclaimers(allTerms);
+      }
+    });
+
+    const restored=[...incoming,...existing];
+    saveProjectsForUser(targetOwner,restored);
+
     for(const a of payload.assets||[]){
       if(!a?.key||!a?.data)continue;
       await putQuoteAsset({key:a.key,familyId:a.familyId||familyId,quoteId:a.quoteId,divisionId:a.divisionId,assetType:a.assetType,pageIndex:a.pageIndex,name:a.name,mime:a.mime||"image/webp",blob:base64ToBlob(a.data,a.mime||"image/webp"),width:a.width,height:a.height,createdAt:a.createdAt||nowIso()});
     }
+
+    // Do not rely only on the delayed background sync after an archive import.
+    // Push the restored data immediately before returning control to the user.
+    if(authBackendConfigured&&authClient&&state.user){
+      try{await syncProjectsToCloudNow(targetOwner,restored);}
+      catch(err){console.error("Immediate archive restore cloud sync failed.",err);toast("Project restored locally. Cloud sync will retry automatically.");}
+    }
+
     state.dashboardMode="active";refreshDashboardNav();renderProjects();toast(`Imported ${payload.projectName||'project'} from .koehn archive.`);
-  }catch(err){toast(err?.message||"Could not import that .koehn archive.");}
+  }catch(err){console.error("Koehn archive import failed.",err);toast(err?.message||"Could not import that .koehn archive.");}
 }
 
 function reviseProject(projectId, ownerUsername){
