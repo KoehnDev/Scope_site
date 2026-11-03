@@ -188,6 +188,29 @@ textarea { resize: vertical; line-height: 1.5; }
 .modal-header { display: flex; justify-content: space-between; align-items: start; }
 .modal-header h2 { margin: 5px 0 0; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 5px; }
+
+.recovery-history-modal { width:min(820px,calc(100% - 40px)); }
+.recovery-history-card { max-height:min(760px,calc(100vh - 70px)); grid-template-rows:auto auto auto auto minmax(0,1fr) auto; }
+.recovery-history-intro { margin:0; color:#73777b; font-size:11px; line-height:1.55; }
+.recovery-history-project-meta { padding:10px 12px; border-radius:9px; background:#f6f7f8; color:#55595d; font-size:11px; font-weight:750; }
+.recovery-history-status { padding:20px; border:1px dashed #d7dade; border-radius:10px; text-align:center; color:#8a8e92; font-size:11px; }
+.recovery-history-list { display:grid; gap:10px; overflow:auto; padding-right:4px; }
+.recovery-history-item { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:16px; align-items:center; padding:14px; border:1px solid #dfe2e5; border-radius:11px; background:#fff; }
+.recovery-history-item-main { min-width:0; display:grid; gap:6px; }
+.recovery-history-item-head { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.recovery-history-item-head strong { font-size:11px; color:#4d5054; }
+.recovery-history-badge { display:inline-flex; align-items:center; padding:3px 7px; border-radius:999px; background:#eef0f2; color:#686c70; font-size:8px; font-weight:850; text-transform:uppercase; letter-spacing:.06em; }
+.recovery-history-badge.baseline { background:#fff0e6; color:var(--orange-dark); }
+.recovery-history-newest { font-size:8px; font-weight:800; color:var(--orange-dark); text-transform:uppercase; letter-spacing:.05em; }
+.recovery-history-item-title { font-size:13px; font-weight:800; color:#34373a; }
+.recovery-history-item-sub { font-size:10px; color:#7b7f83; }
+.recovery-history-stats { display:flex; flex-wrap:wrap; gap:7px; }
+.recovery-history-stats span { padding:4px 7px; border-radius:6px; background:#f6f7f8; color:#666a6e; font-size:9px; font-weight:650; }
+.recovery-history-actions { border-top:1px solid #eceeef; padding-top:12px; }
+@media (max-width:650px){
+  .recovery-history-item { grid-template-columns:1fr; }
+  .recovery-history-item .recovery-restore-btn { width:100%; }
+}
 .toast { position: fixed; right: 22px; bottom: 22px; z-index: 100; background: #33373a; color: white; border-radius: 10px; padding: 11px 14px; font-size: 12px; box-shadow: var(--shadow); transform: translateY(100px); opacity: 0; transition: .24s; }
 .toast.show { transform: translateY(0); opacity: 1; }
 
