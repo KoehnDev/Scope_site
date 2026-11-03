@@ -1010,7 +1010,9 @@ async function loadCloudWorkspace(){
     // newer local records; preserve them before trimming the browser cache.
     for(const pending of pendingCloudUpdates)await syncProjectsToCloudNow(pending.email,pending.projects);
     writeDataStore(data);
-    await migrateLocalAssetsToCloud();
+    // Missing browser-only files must not prevent the project list from loading.
+    try{await migrateLocalAssetsToCloud();}
+    catch(err){console.error("Non-fatal cloud asset migration failure.",err);}
   })().finally(()=>{cloudWorkspacePromise=null;});
   return cloudWorkspacePromise;
 }
