@@ -495,6 +495,14 @@ body { min-height: 100%; overflow-y: auto; }
 .scope-font-color::-webkit-color-swatch-wrapper { padding: 0; }
 .scope-font-color::-webkit-color-swatch { border: 0; border-radius: 3px; }
 .scope-font-color::-moz-color-swatch { border: 0; border-radius: 3px; }
+/* Split font color control: left square applies the current color, right square
+   opens the native color picker to select a different one. */
+.scope-color-control { display:inline-flex; align-items:center; flex:0 0 auto; height:28px; }
+.scope-color-apply { width:30px; height:28px; border:1px solid #b9bec2; border-radius:6px 0 0 6px; font-size:13px; font-weight:800; color:#fff; text-shadow:0 1px 2px rgba(0,0,0,.8); cursor:pointer; }
+.scope-color-apply:hover { filter:brightness(1.1); }
+.scope-color-apply:focus-visible { outline:2px solid var(--orange); outline-offset:1px; }
+.scope-color-apply:disabled { opacity:.45; cursor:not-allowed; }
+.scope-color-control .scope-font-color { width:23px; height:28px; margin-left:-1px; border-radius:0 6px 6px 0; }
 .rich-division-editor { min-height: 180px; width: 100%; border: 1px solid #d8dbde; border-radius: 8px; background: #fff; padding: 11px 12px; font-family: inherit; font-size: 12px; line-height: 1.45; color: #272a2d; outline: none; white-space: pre-wrap; overflow-wrap: anywhere; }
 .rich-division-editor:focus { border-color: #aeb3b7; box-shadow: 0 0 0 2px rgba(243,111,33,.10); }
 .rich-division-editor:empty::before { content: attr(data-placeholder); color: #9da1a5; pointer-events: none; }
