@@ -111,6 +111,56 @@ function applyScopeEditorColor(editor,color,range=null){
   document.execCommand("foreColor",false,safe);
   editor.dispatchEvent(new Event("input",{bubbles:true}));
 }
+function initializeScopeFontColorControls(root=document){
+  $('.scope-font-color',root).forEach(input=>{
+    if(input.dataset.scopeColorReady==='true')return;
+    input.dataset.scopeColorReady='true';
+    const host=input.closest('.division-card, .alternate-scope-card, .text-section-card');
+    const editor=()=>host?.querySelector('.rich-division-editor, .rich-alternate-editor, .rich-closeout-editor')||null;
+    const wrapper=document.createElement('span');
+    wrapper.className='scope-color-control';
+    const apply=document.createElement('button');
+    apply.type='button';
+    apply.className='scope-color-apply';
+    apply.title='Apply current font color to highlighted text';
+    apply.setAttribute('aria-label','Apply current font color');
+    apply.textContent='A';
+    const currentColor=()=>normalizeScopeTextColor(input.value)||'#1c1e20';
+    const updateSwatch=()=>{apply.style.backgroundColor=currentColor();apply.title='Apply '+currentColor()+' to highlighted text';};
+    input.before(wrapper);
+    wrapper.append(apply,input);
+    input.title='Choose a new font color';
+    input.setAttribute('aria-label','Choose a new font color');
+    updateSwatch();
+
+    // The Apply square is its own button: clicking an unchanged color must
+    // work without relying on input[type=color]'s change event.
+    apply.addEventListener('mousedown',event=>{
+      event.preventDefault();
+      apply._scopeRange=scopeEditorSelection(editor());
+    });
+    apply.addEventListener('click',()=>{
+      const selection=apply._scopeRange||scopeEditorSelection(editor());
+      applyScopeEditorColor(editor(),currentColor(),selection);
+      apply._scopeRange=null;
+    });
+
+    // The adjacent native picker is only for choosing a NEW color; keep the
+    // editor selection even when the operating-system color dialog takes focus.
+    input.addEventListener('mousedown',()=>{
+      input._scopeRange=scopeEditorSelection(editor());
+    });
+    input.addEventListener('focus',()=>{
+      if(!input._scopeRange)input._scopeRange=scopeEditorSelection(editor());
+    });
+    input.addEventListener('input',updateSwatch);
+    input.addEventListener('change',()=>{
+      updateSwatch();
+      applyScopeEditorColor(editor(),currentColor(),input._scopeRange);
+      input._scopeRange=null;
+    });
+  });
+}
 function sanitizeScopeHtml(html="") {
   const source=document.createElement("div"); source.innerHTML=String(html||"");
   const out=document.createElement("div");
@@ -2551,7 +2601,7 @@ function applyProjectLockUi(p){
   $$('#editorView .rich-division-editor, #editorView .rich-closeout-editor, #editorView .rich-alternate-editor').forEach(el=>el.setAttribute('contenteditable',locked?'false':'true'));
   const addAltScope=$('#addAlternateScopeBtn'); if(addAltScope)addAltScope.disabled=locked;
   $$('.alternate-delete-btn, .alternate-order-btn').forEach(b=>b.disabled=locked);
-  $$('#editorView .scope-format-btn, #editorView .scope-font-color').forEach(el=>el.disabled=locked);
+  $('#editorView .scope-format-btn, #editorView .scope-font-color, #editorView .scope-color-apply').forEach(el=>el.disabled=locked);
   $("#addPriceItemBtn").disabled=locked;
   $$('.remove-price-item').forEach(b=>b.disabled=locked);
   const deleteBtn=$("#deleteProjectBtn");
@@ -2602,10 +2652,7 @@ function renderDivisionUI(p) {
       editor.dispatchEvent(new Event("input",{bubbles:true}));
     });
   });
-  $$(".scope-font-color",cards).forEach(input=>{
-    input.addEventListener("mousedown",()=>{const card=input.closest(".division-card"),editor=$(".rich-division-editor",card);input._scopeRange=scopeEditorSelection(editor);});
-    input.addEventListener("change",()=>{const card=input.closest(".division-card"),editor=$(".rich-division-editor",card);applyScopeEditorColor(editor,input.value,input._scopeRange);input._scopeRange=null;});
-  });
+  initializeScopeFontColorControls(cards);
   $$('[data-nav-division]').forEach(btn=>btn.addEventListener('click',()=>{ activateTab("scope"); const card=$(`[data-division="${btn.dataset.navDivision}"]`);card.classList.add('open');card.scrollIntoView({behavior:'smooth',block:'center'}); }));
   filterDivisionNav();
 }
@@ -2652,10 +2699,7 @@ function renderAlternateScopes(p){
     btn.addEventListener('mousedown',e=>e.preventDefault());
     btn.addEventListener('click',()=>{const card=btn.closest('.alternate-scope-card'),editor=$('.rich-alternate-editor',card);if(!editor||editor.getAttribute('contenteditable')==='false')return;editor.focus();try{document.execCommand('styleWithCSS',false,false);}catch{}document.execCommand(btn.dataset.format,false,null);editor.dispatchEvent(new Event('input',{bubbles:true}));});
   });
-  $$('.alt-font-color',wrap).forEach(input=>{
-    input.addEventListener('mousedown',()=>{const card=input.closest('.alternate-scope-card'),editor=$('.rich-alternate-editor',card);input._scopeRange=scopeEditorSelection(editor);});
-    input.addEventListener('change',()=>{const card=input.closest('.alternate-scope-card'),editor=$('.rich-alternate-editor',card);applyScopeEditorColor(editor,input.value,input._scopeRange);input._scopeRange=null;});
-  });
+  initializeScopeFontColorControls(wrap);
   $$('[data-alt-move]',wrap).forEach(btn=>btn.addEventListener('click',()=>{
     const card=btn.closest('.alternate-scope-card'),cards=$$('.alternate-scope-card',wrap),idx=cards.indexOf(card),dir=btn.dataset.altMove==='up'?-1:1,target=idx+dir;
     if(target<0||target>=cards.length)return;
@@ -3437,7 +3481,9 @@ async function exportPdf(options={}) {
   const proposalType=["civil","concrete"].includes(p.proposalType)?p.proposalType:"standard";
   const coverPageH=proposalType==="standard"?11.333333:11;
   const doc=new jsPDF({unit:"in",format:[pageW,coverPageH],orientation:"portrait",compress:!fastPreview});
-  const orange=hexToRgb(p.company.orange||DEFAULT_COMPANY.orange);
+  // Proposal heading triangles, bullets and dividers always use Koehn orange.
+  // Some legacy project records inherited a black company accent in revisions.
+  const orange=hexToRgb(DEFAULT_COMPANY.orange);
   const charcoal=[36,43,49], text=[17,17,17], muted=[107,111,114], bg=[250,250,249], pale=[244,244,243], shadow=[228,228,226];
   const contentX=1.12, right=.48, contentW=pageW-contentX-right;
   const topY=1.20, bottomLimit=.72, cardGap=.14;
@@ -4128,8 +4174,7 @@ closeoutTab.addEventListener("input",e=>{if(e.target.matches('.rich-closeout-edi
 closeoutTab.addEventListener("paste",e=>{if(!e.target.matches('.rich-closeout-editor'))return;e.preventDefault();const text=e.clipboardData?.getData("text/plain")||"";document.execCommand("insertText",false,text);});
 closeoutTab.addEventListener("mousedown",e=>{const btn=e.target.closest('.scope-format-btn');if(btn)e.preventDefault();});
 closeoutTab.addEventListener("click",e=>{const btn=e.target.closest('.scope-format-btn');if(!btn)return;const card=btn.closest('.text-section-card'),editor=$('.rich-closeout-editor',card);if(!editor||editor.getAttribute('contenteditable')==='false')return;editor.focus();try{document.execCommand("styleWithCSS",false,false);}catch{}document.execCommand(btn.dataset.format,false,null);editor.dispatchEvent(new Event("input",{bubbles:true}));});
-closeoutTab.addEventListener("mousedown",e=>{const input=e.target.closest('.scope-font-color');if(!input)return;const card=input.closest('.text-section-card'),editor=$('.rich-closeout-editor',card);input._scopeRange=scopeEditorSelection(editor);});
-closeoutTab.addEventListener("change",e=>{const input=e.target.closest('.scope-font-color');if(!input)return;const card=input.closest('.text-section-card'),editor=$('.rich-closeout-editor',card);applyScopeEditorColor(editor,input.value,input._scopeRange);input._scopeRange=null;});
+initializeScopeFontColorControls(closeoutTab);
 $("#priceItems").addEventListener("click",e=>{const b=e.target.closest('.remove-price-item');if(!b)return;const row=b.closest('.price-item-row');row.remove();const base=$('.base-bid-row');if(base)base.classList.toggle('has-alternates',$$('.price-item-row:not(.base-bid-row)').length>0);$("#emptyPriceItems").classList.toggle("hidden",$$('.price-item-row').length>0);scheduleSave();updatePreview();});
 $("#projectDisclaimerSelect").addEventListener("change",()=>{updateSelectedDisclaimerPreview();scheduleSave();updatePreview();});
 document.addEventListener("input",e=>{
