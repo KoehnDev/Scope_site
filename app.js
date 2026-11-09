@@ -112,7 +112,7 @@ function applyScopeEditorColor(editor,color,range=null){
   editor.dispatchEvent(new Event("input",{bubbles:true}));
 }
 function initializeScopeFontColorControls(root=document){
-  $('.scope-font-color',root).forEach(input=>{
+  $$('.scope-font-color',root).forEach(input=>{
     if(input.dataset.scopeColorReady==='true')return;
     input.dataset.scopeColorReady='true';
     const host=input.closest('.division-card, .alternate-scope-card, .text-section-card');
