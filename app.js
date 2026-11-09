@@ -2601,7 +2601,7 @@ function applyProjectLockUi(p){
   $$('#editorView .rich-division-editor, #editorView .rich-closeout-editor, #editorView .rich-alternate-editor').forEach(el=>el.setAttribute('contenteditable',locked?'false':'true'));
   const addAltScope=$('#addAlternateScopeBtn'); if(addAltScope)addAltScope.disabled=locked;
   $$('.alternate-delete-btn, .alternate-order-btn').forEach(b=>b.disabled=locked);
-  $('#editorView .scope-format-btn, #editorView .scope-font-color, #editorView .scope-color-apply').forEach(el=>el.disabled=locked);
+  $$('#editorView .scope-format-btn, #editorView .scope-font-color, #editorView .scope-color-apply').forEach(el=>el.disabled=locked);
   $("#addPriceItemBtn").disabled=locked;
   $$('.remove-price-item').forEach(b=>b.disabled=locked);
   const deleteBtn=$("#deleteProjectBtn");
