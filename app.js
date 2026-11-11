@@ -289,13 +289,15 @@ function assetFileExtension(mime=""){
   if(m.includes("png"))return "png";
   return "jpg";
 }
-async function uploadQuoteAssetToCloud(record){
+async function uploadQuoteAssetToCloud(record,{skipProjectSync=false}={}){
   if(!authBackendConfigured||!authClient||!state.user||!record?.blob||!record?.key)return;
   const ownerUsername=assetOwnerUsername(record.familyId);
   const ownerId=await resolveCloudOwnerId(ownerUsername);
   if(!ownerId)return;
-  const ownerProjects=getProjectsForUser(ownerUsername,{includeDeleted:true});
-  if(ownerProjects.length)await syncProjectsToCloudNow(ownerUsername,ownerProjects);
+  if(!skipProjectSync){
+    const ownerProjects=getProjectsForUser(ownerUsername,{includeDeleted:true});
+    if(ownerProjects.length)await syncProjectsToCloudNow(ownerUsername,ownerProjects);
+  }
   const familyId=String(record.familyId||"");
   const ext=assetFileExtension(record.mime);
   const storagePath=`${ownerId}/${safeFilePart(familyId)}/${safeFilePart(record.key)}.${ext}`;
@@ -1469,6 +1471,7 @@ function renderProjects() {
           <div class="project-menu hidden" data-menu-panel="${p.id}">
             ${adminRecovery?`<button type="button" data-restore-family="${f.familyId}" data-owner="${esc(f.owner)}">Restore Project</button>`:`
               <button type="button" data-revise-project="${p.id}" data-owner="${esc(f.owner)}">Revise</button>
+              <button type="button" data-duplicate-project="${p.id}" data-owner="${esc(f.owner)}">Duplicate</button>
               <button type="button" data-kickoff-project="${p.id}" data-owner="${esc(f.owner)}">Kickoff</button>
               <button type="button" data-archive-family="${f.familyId}" data-owner="${esc(f.owner)}">Archive</button>
               <button type="button" data-lock-project="${p.id}" data-owner="${esc(f.owner)}">${p.locked?'Unlock':'Lock'}</button>
@@ -1483,8 +1486,9 @@ function renderProjects() {
   });
   $$('[data-open-project]').forEach(b=>b.addEventListener('click',()=>openProject(b.dataset.openProject,b.dataset.owner)));
   $$('[data-project-menu]').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();const panel=$(`[data-menu-panel="${CSS.escape(b.dataset.projectMenu)}"]`);$$('.project-menu').forEach(x=>{if(x!==panel)x.classList.add('hidden')});panel?.classList.toggle('hidden');}));
-  $$('[data-revise-project]').forEach(b=>b.addEventListener('click',()=>reviseProject(b.dataset.reviseProject,b.dataset.owner)));
-  $$('[data-kickoff-project]').forEach(b=>b.addEventListener('click',()=>openKickoff(b.dataset.kickoffProject,b.dataset.owner)));
+  $('[data-revise-project]').forEach(b=>b.addEventListener('click',()=>reviseProject(b.dataset.reviseProject,b.dataset.owner)));
+  $('[data-duplicate-project]').forEach(b=>b.addEventListener('click',()=>duplicateProject(b.dataset.duplicateProject,b.dataset.owner,b)));
+  $('[data-kickoff-project]').forEach(b=>b.addEventListener('click',()=>openKickoff(b.dataset.kickoffProject,b.dataset.owner)));
   $$('[data-archive-family]').forEach(b=>b.addEventListener('click',()=>archiveFamilyToKoehn(b.dataset.archiveFamily,b.dataset.owner)));
   $$('[data-lock-project]').forEach(b=>b.addEventListener('click',()=>toggleProjectLock(b.dataset.lockProject,b.dataset.owner)));
   $$('[data-delete-family]').forEach(b=>b.addEventListener('click',()=>softDeleteFamily(b.dataset.deleteFamily,b.dataset.owner)));
@@ -2484,6 +2488,122 @@ async function importKoehnProjectArchive(file){
 
     state.dashboardMode="active";refreshDashboardNav();renderProjects();toast(`Imported ${payload.projectName||'project'} from .koehn archive.`);
   }catch(err){console.error("Koehn archive import failed.",err);toast(err?.message||"Could not import that .koehn archive.");}
+}
+
+function prepareDuplicateProject(source, ownerUsername) {
+  // A duplicate is a new, independent ORIGINAL project, not another revision.
+  // All nested financials, scopes, alternates, schedule and kickoff settings
+  // are deep-copied so edits in one project cannot mutate the other.
+  const copied=cloneJson(source);
+  const id=uid(), timestamp=nowIso();
+  const today=new Date();
+  const proposalDate=`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+  copied.id=id;
+  copied.familyId=id;
+  copied.ownerUsername=ownerUsername;
+  copied.version=0;
+  copied.parentRevisionId=null;
+  copied.createdAt=timestamp;
+  copied.updatedAt=timestamp;
+  copied.projectName=`${String(source.projectName||'Untitled Project').trim()} (Copy)`;
+  copied.projectNumber='';
+  copied.proposalDate=proposalDate;
+  copied.archived=false;
+  copied.locked=false;
+  copied.deletedByUser=false;
+  copied.deletedAt=null;
+  copied.deletedBy=null;
+  copied.deletedScope=null;
+  copied.accepted=false;
+  copied.acceptedAt=null;
+  copied.duplicatedFromProjectId=source.id;
+  delete copied.archiveImportedAt;
+  delete copied.archiveOriginalUpdatedAt;
+  (copied.priceItems||[]).forEach(item=>{item.id=item.isBaseBid?`base-bid-${id}`:uid();});
+  (copied.alternateScopes||[]).forEach(item=>{item.id=uid();});
+
+  // Quotes and inline images are copied to NEW asset keys and quote IDs.
+  // Never reuse the source family's asset keys.
+  const assetKeys=new Map(), quoteIds=new Map(), divisionIds=new Map();
+  const kickoff=copied.kickoff||{};
+  (kickoff.divisions||[]).forEach(d=>{
+    const originalId=d.id;
+    d.id=uid();
+    if(originalId)divisionIds.set(originalId,d.id);
+  });
+  (kickoff.quotes||[]).forEach(q=>{
+    const originalId=q.id;
+    q.id=uid();
+    if(originalId)quoteIds.set(originalId,q.id);
+    if(q.divisionId)q.divisionId=divisionIds.get(q.divisionId)||q.divisionId;
+    q.pages=(q.pages||[]).map((oldKey,index)=>{
+      if(!oldKey)return oldKey;
+      const newKey=`${id}::${q.id}::${index+1}`;
+      assetKeys.set(oldKey,{key:newKey,quoteId:q.id});
+      return newKey;
+    });
+  });
+  (kickoff.divisions||[]).forEach(d=>{
+    const html=String(d.notesHtml||'');
+    if(!html.includes('data-kickoff-image-key'))return;
+    const oldKeys=kickoffImageKeysFromHtml(html);
+    oldKeys.forEach(oldKey=>{
+      if(!assetKeys.has(oldKey))assetKeys.set(oldKey,{key:`${id}::division-image::${d.id}::${uid()}`,divisionId:d.id});
+    });
+    d.notesHtml=[...new Set(oldKeys)].reduce((markup,oldKey)=>markup.split(oldKey).join(assetKeys.get(oldKey).key),html);
+  });
+  kickoff.pageOrder=(kickoff.pageOrder||[]).map(token=>{
+    const original=String(token||'');
+    if(original.startsWith('division:'))return 'division:'+(divisionIds.get(original.slice(9))||original.slice(9));
+    if(original.startsWith('quote:'))return 'quote:'+(quoteIds.get(original.slice(6))||original.slice(6));
+    return original;
+  });
+  copied.kickoff=kickoff;
+  return {project:copied,assetKeys};
+}
+async function duplicateProject(projectId,ownerUsername,button=null){
+  const owner=ownerUsername||state.user?.username;
+  if(ownerKey(owner)!==ownerKey(state.user?.username)&&!isAdmin())return toast('You can only duplicate your own projects.');
+  const source=getProjectsForUser(owner,{includeDeleted:true}).find(p=>p.id===projectId);
+  if(!source||source.deletedByUser)return toast('This project is not available to duplicate.');
+  if(button?.disabled)return;
+  if(button)button.disabled=true;
+  const originalLabel=button?.textContent;
+  if(button)button.textContent='Duplicating…';
+  try{
+    const {project,assetKeys}=prepareDuplicateProject(source,owner);
+    const assetCopies=[];
+    // Read every required attachment before saving anything. An incomplete
+    // duplicate must not silently lose PDF quote pages or inline photos.
+    for(const [oldKey,details] of assetKeys){
+      const sourceAsset=await getQuoteAsset(oldKey);
+      if(!sourceAsset?.blob)throw new Error('A kickoff attachment could not be found. The project was not duplicated.');
+      assetCopies.push({...sourceAsset,key:details.key,familyId:project.familyId,
+        quoteId:details.quoteId||undefined,divisionId:details.divisionId||undefined,createdAt:nowIso()});
+    }
+    for(const asset of assetCopies)await putQuoteAssetLocal(asset);
+    // Store an independent project family without touching the original.
+    putProject(project,owner);
+    if(authBackendConfigured&&authClient&&state.user){
+      try{
+        // Upload the duplicate itself first; asset metadata references its family.
+        await syncProjectsToCloudNow(owner,[project]);
+        for(const asset of assetCopies)await uploadQuoteAssetToCloud(asset,{skipProjectSync:true});
+      }catch(syncError){
+        console.error('Duplicate created locally, but cloud sync did not complete.',syncError);
+        toast('Copy created locally. Some cloud files are pending; they will retry after sign-in.');
+      }
+    }
+    state.dashboardMode='active';
+    refreshDashboardNav();
+    renderProjects();
+    toast(`Created ${project.projectName}. You can assign a new project number.`);
+  }catch(err){
+    console.error('Project duplicate failed.',err);
+    toast(err?.message||'Could not duplicate this project.');
+  }finally{
+    if(button){button.disabled=false;button.textContent=originalLabel||'Duplicate';}
+  }
 }
 
 function reviseProject(projectId, ownerUsername){
