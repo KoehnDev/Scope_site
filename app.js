@@ -1527,9 +1527,9 @@ function renderProjects() {
   });
   $$('[data-open-project]').forEach(b=>b.addEventListener('click',()=>openProject(b.dataset.openProject,b.dataset.owner)));
   $$('[data-project-menu]').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();const panel=$(`[data-menu-panel="${CSS.escape(b.dataset.projectMenu)}"]`);$$('.project-menu').forEach(x=>{if(x!==panel)x.classList.add('hidden')});panel?.classList.toggle('hidden');}));
-  $('[data-revise-project]').forEach(b=>b.addEventListener('click',()=>reviseProject(b.dataset.reviseProject,b.dataset.owner)));
-  $('[data-duplicate-project]').forEach(b=>b.addEventListener('click',()=>duplicateProject(b.dataset.duplicateProject,b.dataset.owner,b)));
-  $('[data-kickoff-project]').forEach(b=>b.addEventListener('click',()=>openKickoff(b.dataset.kickoffProject,b.dataset.owner)));
+  $$('[data-revise-project]').forEach(b=>b.addEventListener('click',()=>reviseProject(b.dataset.reviseProject,b.dataset.owner)));
+  $$('[data-duplicate-project]').forEach(b=>b.addEventListener('click',()=>duplicateProject(b.dataset.duplicateProject,b.dataset.owner,b)));
+  $$('[data-kickoff-project]').forEach(b=>b.addEventListener('click',()=>openKickoff(b.dataset.kickoffProject,b.dataset.owner)));
   $$('[data-archive-family]').forEach(b=>b.addEventListener('click',()=>archiveFamilyToKoehn(b.dataset.archiveFamily,b.dataset.owner)));
   $$('[data-lock-project]').forEach(b=>b.addEventListener('click',()=>toggleProjectLock(b.dataset.lockProject,b.dataset.owner)));
   $$('[data-delete-family]').forEach(b=>b.addEventListener('click',()=>softDeleteFamily(b.dataset.deleteFamily,b.dataset.owner)));
