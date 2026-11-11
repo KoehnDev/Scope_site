@@ -805,3 +805,6 @@ body { min-height: 100%; overflow-y: auto; }
 .kickoff-division-contact-row label{display:grid;gap:5px;min-width:0;color:#74797d;font-size:8px;font-weight:800;letter-spacing:.06em;text-transform:uppercase}
 .kickoff-division-contact-row input{min-width:0;width:100%}
 @media(max-width:640px){.kickoff-division-contact-row{grid-template-columns:1fr}}
+
+/* Highlight the newly created independent project card after Duplicate. */
+.project-card.duplicate-created { outline:2px solid var(--orange); outline-offset:2px; }
