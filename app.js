@@ -2584,20 +2584,23 @@ async function duplicateProject(projectId,ownerUsername,button=null){
     for(const asset of assetCopies)await putQuoteAssetLocal(asset);
     // Store an independent project family without touching the original.
     putProject(project,owner);
+    let cloudPending=false;
     if(authBackendConfigured&&authClient&&state.user){
       try{
         // Upload the duplicate itself first; asset metadata references its family.
         await syncProjectsToCloudNow(owner,[project]);
         for(const asset of assetCopies)await uploadQuoteAssetToCloud(asset,{skipProjectSync:true});
       }catch(syncError){
+        cloudPending=true;
         console.error('Duplicate created locally, but cloud sync did not complete.',syncError);
-        toast('Copy created locally. Some cloud files are pending; they will retry after sign-in.');
       }
     }
     state.dashboardMode='active';
     refreshDashboardNav();
     renderProjects();
-    toast(`Created ${project.projectName}. You can assign a new project number.`);
+    toast(cloudPending
+      ? 'Copy created locally. Cloud attachments will retry on your next sign-in.'
+      : `Created ${project.projectName}. Enter a new project number when ready.`);
   }catch(err){
     console.error('Project duplicate failed.',err);
     toast(err?.message||'Could not duplicate this project.');
