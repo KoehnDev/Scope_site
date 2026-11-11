@@ -637,6 +637,13 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    // Supabase's supported alternate CDN is a fallback when jsDelivr is
+    // blocked or temporarily unavailable. Execute before the app initializes.
+    if (!window.supabase?.createClient) {
+      document.write('<scr' + 'ipt src="https://unpkg.com/@supabase/supabase-js@2"></scr' + 'ipt>');
+    }
+  </script>
   <script src="app.js?v=20261111-1"></script>
   <script src="proposal-alt-theme.js?v=20261102-4"></script>
 </body>
