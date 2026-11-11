@@ -1496,6 +1496,7 @@ function renderProjects() {
     if(p.deletedByUser){status.push(`Deleted by ${p.deletedBy||'Unknown'}`);status.push(`Deleted ${fmtTime(p.deletedAt)}`);}
     const familyAccepted=f.versions.some(v=>v.accepted);
     const card=document.createElement("article"); card.className=`project-card ${familyDeleted?'deleted-card':''} ${familyAccepted?'accepted-card':''}`;
+    card.dataset.projectFamily=f.familyId;
     const adminRecovery=(state.dashboardMode==="deleted"&&isAdmin());
     card.innerHTML=`
       <div class="project-card-head">
@@ -2612,35 +2613,71 @@ async function duplicateProject(projectId,ownerUsername,button=null){
   if(button)button.textContent='Duplicating…';
   try{
     const {project,assetKeys}=prepareDuplicateProject(source,owner);
+    if(project.id===source.id||project.familyId!==(project.id)||project.familyId===(source.familyId||source.id)){
+      throw new Error('The copy did not receive an independent project ID.');
+    }
     const assetCopies=[];
-    // Read every required attachment before saving anything. An incomplete
-    // duplicate must not silently lose PDF quote pages or inline photos.
+    // Verify the source quote attachments before writing the new project.
     for(const [oldKey,details] of assetKeys){
       const sourceAsset=await getQuoteAsset(oldKey);
-      if(!sourceAsset?.blob)throw new Error('A kickoff attachment could not be found. The project was not duplicated.');
+      if(!sourceAsset?.blob)throw new Error('A referenced kickoff attachment is missing, so the copy was not created. Please check the original kickoff documents.');
       assetCopies.push({...sourceAsset,key:details.key,familyId:project.familyId,
         quoteId:details.quoteId||undefined,divisionId:details.divisionId||undefined,createdAt:nowIso()});
     }
-    for(const asset of assetCopies)await putQuoteAssetLocal(asset);
-    // Store an independent project family without touching the original.
-    putProject(project,owner);
-    let cloudPending=false;
+
+    // Confirm that the NEW independent family actually exists in Supabase
+    // before telling the user the duplication succeeded.
     if(authBackendConfigured&&authClient&&state.user){
-      try{
-        // Upload the duplicate itself first; asset metadata references its family.
-        await syncProjectsToCloudNow(owner,[project]);
-        for(const asset of assetCopies)await uploadQuoteAssetToCloud(asset,{skipProjectSync:true});
-      }catch(syncError){
-        cloudPending=true;
-        console.error('Duplicate created locally, but cloud sync did not complete.',syncError);
+      const ownerId=await resolveCloudOwnerId(owner);
+      if(!ownerId)throw new Error('The company workspace could not identify this project owner.');
+      const row=cloudProjectRow(project,ownerId,owner);
+      const {data:inserted,error}=await authClient.from('projects')
+        .insert(row)
+        .select('id,family_id')
+        .single();
+      if(error)throw error;
+      if(inserted?.id!==project.id||inserted?.family_id!==project.familyId){
+        throw new Error('The duplicate was not confirmed as a separate cloud project.');
       }
     }
-    state.dashboardMode='active';
+
+    // Keep the new copy in the browser's current project list without
+    // needlessly syncing all pre-existing project rows.
+    if(authBackendConfigured&&authClient&&state.user)replaceLocalProjectWithoutCloudSync(owner,project);
+    else putProject(project,owner);
+
+    let uploadFailures=0;
+    for(const asset of assetCopies){
+      try{
+        await putQuoteAssetLocal(asset);
+        if(authBackendConfigured&&authClient&&state.user){
+          await uploadQuoteAssetToCloud(asset,{skipProjectSync:true});
+        }
+      }catch(err){uploadFailures++;console.error('Could not copy a kickoff attachment to the duplicate.',err);}
+    }
+
+    // A search by the original project number will hide the copy because
+    // its project number is intentionally blank. Clear the filter.
+    const search=$("#projectSearch");
+    if(search)search.value='';
+    if(isAdmin()&&ownerKey(owner)!==ownerKey(state.user?.username)){
+      state.dashboardMode='admin';
+      state.adminUserFilter=owner;
+    }else{
+      state.dashboardMode='active';
+    }
     refreshDashboardNav();
+    if(state.dashboardMode==='admin'&&$("#adminUserFilter"))$("#adminUserFilter").value=owner;
     renderProjects();
-    toast(cloudPending
-      ? 'Copy created locally. Cloud attachments will retry on your next sign-in.'
-      : `Created ${project.projectName}. Enter a new project number when ready.`);
+    const card=[...$$('[data-project-family]')].find(el=>el.dataset.projectFamily===project.familyId);
+    if(!card)throw new Error('The duplicate was saved, but its dashboard card could not be displayed.');
+    card.classList.add('duplicate-created');
+    card.scrollIntoView?.({block:'center',behavior:'smooth'});
+    if(uploadFailures){
+      toast(`Created ${project.projectName}, but ${uploadFailures} attachment${uploadFailures===1?'':'s'} could not be synced. Check its kickoff documents.`);
+    }else{
+      toast(`Created separate project: ${project.projectName}. Assign it a new project number.`);
+    }
   }catch(err){
     console.error('Project duplicate failed.',err);
     toast(err?.message||'Could not duplicate this project.');
