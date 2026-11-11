@@ -1285,7 +1285,13 @@ async function handleAuthSubmit(e) {
       const record=await hydrateRemoteUser(data.session);
       if(record?.mustChangePassword){showPasswordChangeDialog("required");return;}
       enterDashboard();
-    }catch(err){console.error(err);toast("Email or password is incorrect.");}
+    }catch(err){
+      console.error("Company sign-in failed.",err);
+      const msg=String(err?.message||"");
+      toast(/invalid login credentials|invalid credentials|incorrect password/i.test(msg)
+        ? "Email or password is incorrect."
+        : "Company sign-in could not complete. Check your connection and try again.");
+    }
     finally{$("#authSubmit").disabled=false;}
     return;
   }
@@ -1307,13 +1313,35 @@ function restoreSession() {
   const record=getUserRecord(username); if (!record) return showAuth();
   state.user=normalizeUser(record); enterDashboard();
 }
+function showSecureAuthConnectionError(message){
+  authBackendConfigured=false;
+  authClient=null;
+  showAuth();
+  $("#authBackendBadge").textContent="Company login temporarily unavailable";
+  $("#authTitle").textContent="Connection issue";
+  $("#authSubtitle").textContent="Scope Builder could not start secure company sign-in.";
+  $("#authStorageNote").textContent=message||"Reload the page to reconnect. Your company password has not been changed.";
+  $("#authSubmit").disabled=true;
+  $("#authSubmit").textContent="Connection unavailable";
+  $("#toggleAuthMode").classList.add("hidden");
+  $("#forgotPasswordBtn").classList.add("hidden");
+}
 async function initializeAuthentication(){
-  try{
-    const cfg=DIRECT_SUPABASE_CONFIG;
-    if(cfg?.supabaseUrl&&cfg.supabasePublishableKey&&window.supabase?.createClient){
-      authBackendConfigured=true; authBackendConfig=cfg;
+  const cfg=DIRECT_SUPABASE_CONFIG;
+  // When a company backend is configured, NEVER reinterpret company passwords
+  // as local prototype passwords if a CDN script or session lookup fails.
+  if(cfg?.supabaseUrl&&cfg.supabasePublishableKey){
+    if(!window.supabase?.createClient){
+      console.error("Supabase library unavailable on both CDN sources.");
+      showSecureAuthConnectionError("The secure sign-in library could not load. Check your connection and refresh the page.");
+      return;
+    }
+    try{
+      authBackendConfigured=true;
+      authBackendConfig=cfg;
       authClient=window.supabase.createClient(cfg.supabaseUrl,cfg.supabasePublishableKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
       updateAuthMode();
+      $("#authSubmit").disabled=false;
       authClient.auth.onAuthStateChange((event,session)=>{
         if(event==='PASSWORD_RECOVERY'){
           if(session)hydrateRemoteUser(session).catch(console.error);
@@ -1324,7 +1352,8 @@ async function initializeAuthentication(){
           hydrateRemoteUser(session).then(record=>{if(record&&!record.mustChangePassword&&$("#passwordChangeDialog")?.open)$("#passwordChangeDialog").close();}).catch(console.error);
         }
       });
-      const {data:{session}}=await authClient.auth.getSession();
+      const {data:{session},error:sessionError}=await authClient.auth.getSession();
+      if(sessionError)throw sessionError;
       if(session){
         const record=await hydrateRemoteUser(session);
         const authFlow=new URLSearchParams(location.search).get('auth');
@@ -1333,8 +1362,19 @@ async function initializeAuthentication(){
         else enterDashboard();
       }else showAuth();
       return;
+    }catch(err){
+      console.error("Secure company login initialization failed.",err);
+      if(authClient){
+        // A failed session restore must not force the user into local login.
+        authBackendConfigured=true;
+        updateAuthMode();
+        showAuth();
+        $("#authStorageNote").textContent="Could not restore your prior session. You can sign in again with your existing company password.";
+      }else showSecureAuthConnectionError("Secure login could not initialize. Refresh the page to reconnect.");
+      return;
     }
-  }catch(err){console.error('Secure backend initialization failed.',err);}
+  }
+  // The local prototype exists only when this application has no company config.
   authBackendConfigured=false;authClient=null;updateAuthMode();showAuth();
 }
 async function handleForgotPassword(){
