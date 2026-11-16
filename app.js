@@ -3729,6 +3729,15 @@ async function exportPdf(options={}) {
     // four marketing-approved US Letter PDF templates. Text begins BELOW each
     // heading, never over the preprinted icons, labels, or horizontal rules.
     // Every value is fitted inside its own grid cell.
+    // The approved GC PDF itself has bright-white printed Project and Date
+    // entry rectangles. Blend ONLY those two blank entry areas into the nearby
+    // off-white paper on the exported overlay. The locked PDF file is untouched.
+    // Civil, Concrete, and Self-Perform originals have no such rectangles.
+    if(proposalType==='standard'){
+      setFill([252,252,252]);
+      doc.rect(1.20,4.72,2.08,.34,'F');
+      doc.rect(4.315,4.72,1.57,.34,'F');
+    }
     const cells={
       project:{x1:1.26,x2:3.75,cy:4.99,maxLines:2},
       // These narrower right-column cells stop before the original
@@ -3743,18 +3752,20 @@ async function exportPdf(options={}) {
       officePhone:{x1:3.33,x2:4.72,cy:9.40,maxLines:2},
       officeWebsite:{x1:4.91,x2:7.22,cy:9.40,maxLines:2}
     };
-    function drawCoverValue(value,cell,{fontSize=10.3,bold=true}={}){
+    function drawCoverValue(value,cell,{fontSize=12.2,minFontSize=9.4}={}){
       const raw=String(value||'').trim().replace(/\s*\n\s*/g,', ');
       if(!raw)return;
       const maxWidth=Math.max(.2,cell.x2-cell.x1-.07);
-      const lineHeight=.176;
+      const lineHeight=.19;
       let size=fontSize,lines=[];
+      // Every populated value uses the same bold, near-black text. Only the
+      // point size can reduce to keep long values inside their existing cell.
+      doc.setFont('helvetica','bold');
       for(;;){
-        doc.setFont('helvetica',bold?'bold':'normal');
         doc.setFontSize(size);
         lines=doc.splitTextToSize(raw,maxWidth);
-        if(lines.length<=cell.maxLines||size<=8.2)break;
-        size-=.4;
+        if(lines.length<=cell.maxLines||size<=minFontSize)break;
+        size=Math.max(minFontSize,size-.3);
       }
       if(lines.length>cell.maxLines){
         lines=lines.slice(0,cell.maxLines);
@@ -3763,20 +3774,22 @@ async function exportPdf(options={}) {
         lines[cell.maxLines-1]=last.trimEnd()+'...';
       }
       const baseline=cell.cy-((lines.length-1)*lineHeight)/2+.035;
-      setText([36,39,42]);
+      setText([23,25,27]);
       doc.text(lines,cell.x1,baseline,{lineHeightFactor:lineHeight/(size/72),maxWidth});
     }
 
-    drawCoverValue(p.projectName||'Untitled Project',cells.project,{fontSize:10.8});
-    drawCoverValue(fmtDate(p.proposalDate),cells.date,{fontSize:10.5});
-    drawCoverValue(p.clientName||'',cells.client,{fontSize:10.5});
-    drawCoverValue((p.projectAddress||'').trim(),cells.projectAddress,{fontSize:10.0,bold:false});
-    drawCoverValue((p.attention||'').trim(),cells.attention,{fontSize:10.5});
-    drawCoverValue(rev||'Original',cells.revision,{fontSize:10.5});
-    drawCoverValue((p.preparedBy||'').trim(),cells.prepared,{fontSize:10.5});
-    drawCoverValue((coverOffice.address||'').trim(),cells.officeAddress,{fontSize:8.8,bold:false});
-    drawCoverValue(livePhone,cells.officePhone,{fontSize:9.1,bold:false});
-    drawCoverValue(website,cells.officeWebsite,{fontSize:9.1,bold:false});
+    // Matching bold value hierarchy: primary fields 12.2pt, office contacts
+    // 10.5pt. Both are larger than before and keep the marketing layout fixed.
+    drawCoverValue(p.projectName||'Untitled Project',cells.project,{fontSize:12.2});
+    drawCoverValue(fmtDate(p.proposalDate),cells.date,{fontSize:12.2});
+    drawCoverValue(p.clientName||'',cells.client,{fontSize:12.2});
+    drawCoverValue((p.projectAddress||'').trim(),cells.projectAddress,{fontSize:12.2});
+    drawCoverValue((p.attention||'').trim(),cells.attention,{fontSize:12.2});
+    drawCoverValue(rev||'Original',cells.revision,{fontSize:12.2});
+    drawCoverValue((p.preparedBy||'').trim(),cells.prepared,{fontSize:12.2});
+    drawCoverValue((coverOffice.address||'').trim(),cells.officeAddress,{fontSize:10.5,minFontSize:9});
+    drawCoverValue(livePhone,cells.officePhone,{fontSize:10.5,minFontSize:9});
+    drawCoverValue(website,cells.officeWebsite,{fontSize:10.5,minFontSize:9});
   }
   function drawBackground(){
     if(interiorData)doc.addImage(interiorData,'PNG',0,0,pageW,pageH,undefined,'FAST');
