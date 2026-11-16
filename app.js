@@ -3689,27 +3689,28 @@ async function exportPdf(options={}) {
   const contentX=1.12, right=.48, contentW=pageW-contentX-right;
   const topY=1.20, bottomLimit=.72, cardGap=.14;
   const bodyFont=12.0, bodyLeading=.215, minPdfFont=12.0;
-  let coverRevisionData=null,coverOriginalData=null,interiorData=null;
-  // Cover art is from the marketing-approved 2026 GC, Civil, Concrete, and
-  // Self-Perform templates. Revisions share the exact same cover design;
-  // the Revision field on the template displays V1/V2/etc.
-  // Interior proposal pages deliberately retain their existing background.
-  const coverArt={
-    standard:'assets/marketing/new-covers/gc.webp?v=20261116-1',
-    civil:'assets/marketing/new-covers/civil.webp?v=20261116-1',
-    concrete:'assets/marketing/new-covers/concrete.webp?v=20261116-1',
-    'self-perform':'assets/marketing/new-covers/sp.webp?v=20261116-1'
+  let interiorData=null;
+  // The approved marketing PDF is the immutable page-one master.
+  // Never rasterize, rebuild, mask, or redraw the Koehn marketing artwork.
+  const approvedCoverPdfPaths={
+    standard:'assets/marketing/approved-pdf-covers/gc.pdf',
+    civil:'assets/marketing/approved-pdf-covers/civil.pdf',
+    concrete:'assets/marketing/approved-pdf-covers/concrete.pdf',
+    'self-perform':'assets/marketing/approved-pdf-covers/self-perform.pdf'
   };
-  try{
-    [coverOriginalData,interiorData]=await Promise.all([
-      imageToDataUrl(coverArt[proposalType]),
-      imageToDataUrl('assets/marketing/marketing-blank.png')
-    ]);
-    coverRevisionData=coverOriginalData;
+  let originalCoverPdfBytes=null;
+  try {
+    if(!window.PDFLib)throw new Error('PDF composer did not load.');
+    const coverResponse=await fetch(approvedCoverPdfPaths[proposalType],{cache:'no-store'});
+    if(!coverResponse.ok)throw new Error('Approved cover unavailable: '+proposalType+' ('+coverResponse.status+')');
+    originalCoverPdfBytes=await coverResponse.arrayBuffer();
+    if(!originalCoverPdfBytes.byteLength||!new Uint8Array(originalCoverPdfBytes).slice(0,5).every((b,i)=>b===[37,80,68,70,45][i]))
+      throw new Error('Approved cover is not a PDF: '+proposalType);
+    interiorData=await imageToDataUrl('assets/marketing/marketing-blank.png');
   }catch(err){
-    console.error('Approved proposal cover failed to load.',err);
-    if(!previewOnly)toast('Proposal cover template could not load. Refresh the page and try again.');
-    return null;
+    console.error('Exact approved proposal PDF cover could not load.',err);
+    if(!previewOnly)toast('Approved marketing PDF missing. Export stopped to protect the proposal design.');
+    throw err;
   }
   if(!await uiYield())return null;
   const rgb=(arr)=>arr;
@@ -3717,11 +3718,9 @@ async function exportPdf(options={}) {
   const rev=(p.version||0)>0?versionLabel(p):"";
   function setFill(c){doc.setFillColor(...c);}
   function setText(c){doc.setTextColor(...c);}
-  function coverMask(x,y,w,h,color=[255,255,255]){doc.setFillColor(...color);doc.rect(x,y,w,h,'F');}
   function drawCover(){
-    const coverData=rev?coverRevisionData:coverOriginalData;
-    if(coverData)doc.addImage(coverData,'PNG',0,0,pageW,coverPageH,undefined,'FAST');
-    else{setFill([255,255,255]);doc.rect(0,0,pageW,coverPageH,'F');}
+    // Transparent text-only page. The approved source PDF is added UNDER
+    // this page at export time; no original graphic elements are redrawn.
 
     const coverOffice={...getOfficeContact(p.estimatingOffice||'fredonia'),...(p.officeContact||{})};
     const livePhone=coverOffice.phone||'';
@@ -4150,9 +4149,38 @@ async function exportPdf(options={}) {
     if(pageData.mode==='advanced')drawAdvancedSummaryPage(pageData,pageNum,totalPages);else drawBasicSummaryPage(pageData,pageNum,totalPages);
     if(!await uiYield())return null;
   }
-  if(previewOnly)return doc;
+  // Assemble the exact original marketing PDF cover with the generated
+  // text-only overlay, then append the unchanged inner proposal pages.
+  const {PDFDocument}=window.PDFLib;
+  const [approvedMaster,interiorPdf]=await Promise.all([
+    PDFDocument.load(originalCoverPdfBytes),
+    PDFDocument.load(doc.output('arraybuffer'))
+  ]);
+  if(approvedMaster.getPageCount()!==1)throw new Error('Approved proposal cover must contain exactly one page.');
+  const masterSize=approvedMaster.getPage(0).getSize();
+  if(Math.abs(masterSize.width-612)>.1||Math.abs(masterSize.height-792)>.1)
+    throw new Error('Approved proposal cover must be US Letter (612 x 792 pt).');
+  const composed=await PDFDocument.create();
+  const [firstPage]=await composed.copyPages(approvedMaster,[0]);
+  composed.addPage(firstPage);
+  const [textOnlyCover]=await composed.embedPdf(doc.output('arraybuffer'),[0]);
+  firstPage.drawPage(textOnlyCover,{x:0,y:0,width:612,height:792});
+  if(interiorPdf.getPageCount()>1){
+    const indexes=Array.from({length:interiorPdf.getPageCount()-1},(_,i)=>i+1);
+    const innerPages=await composed.copyPages(interiorPdf,indexes);
+    innerPages.forEach(page=>composed.addPage(page));
+  }
+  const exactPdf=await composed.save();
+  const exactArrayBuffer=()=>exactPdf.buffer.slice(exactPdf.byteOffset,exactPdf.byteOffset+exactPdf.byteLength);
+  // Existing preview renderer expects .output('arraybuffer').
+  if(previewOnly)return {output:(kind)=>kind==='arraybuffer'?exactArrayBuffer():exactArrayBuffer()};
   const proposalNumber=cleanPdfFilenameText(p.projectNumber||'');
-  doc.save(`Proposal${proposalNumber?` ${proposalNumber}`:''}.pdf`);
+  const name=`Proposal${proposalNumber?` ${proposalNumber}`:''}.pdf`;
+  const url=URL.createObjectURL(new Blob([exactPdf],{type:'application/pdf'}));
+  try {
+    const a=document.createElement('a');a.href=url;a.download=name;
+    document.body.appendChild(a);a.click();a.remove();
+  }finally{setTimeout(()=>URL.revokeObjectURL(url),60000);}
   setSaveStatus("All changes saved");toast("PDF exported.");
 }
 
