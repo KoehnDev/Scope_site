@@ -3738,25 +3738,28 @@ async function exportPdf(options={}) {
       doc.rect(1.20,4.72,2.08,.34,'F');
       doc.rect(4.30,4.72,1.63,.34,'F');
     }
+    // First-line baselines keep both single- and multi-line values aligned just
+    // below their printed headings. Changes affect only added text; the locked
+    // marketing PDF and its artwork are never repositioned or recreated.
     const cells={
-      project:{x1:1.26,x2:3.44,cy:4.99,maxLines:2},
-      // These narrower right-column cells stop before the original
-      // photography wedge. No marketing artwork is altered or masked.
-      date:{x1:4.29,x2:5.90,cy:4.99,maxLines:1},
-      client:{x1:1.26,x2:3.44,cy:6.13,maxLines:2},
-      projectAddress:{x1:4.29,x2:5.98,cy:6.13,maxLines:3},
-      attention:{x1:1.26,x2:3.44,cy:7.28,maxLines:2},
-      revision:{x1:4.29,x2:6.20,cy:7.28,maxLines:1},
-      prepared:{x1:1.26,x2:6.99,cy:8.42,maxLines:2},
-      officeAddress:{x1:1.42,x2:3.20,cy:9.40,maxLines:3},
-      officePhone:{x1:3.33,x2:4.72,cy:9.40,maxLines:2},
-      officeWebsite:{x1:4.91,x2:7.22,cy:9.40,maxLines:2}
+      project:{x1:1.26,x2:3.44,firstBaseline:4.91,maxLines:2},
+      // Narrow right-column bounds protect the original photography wedge.
+      date:{x1:4.29,x2:5.90,firstBaseline:4.91,maxLines:1},
+      client:{x1:1.26,x2:3.44,firstBaseline:6.01,maxLines:2},
+      projectAddress:{x1:4.29,x2:5.98,firstBaseline:6.01,maxLines:3},
+      attention:{x1:1.26,x2:3.44,firstBaseline:7.15,maxLines:2},
+      revision:{x1:4.29,x2:6.20,firstBaseline:7.15,maxLines:1},
+      prepared:{x1:1.26,x2:6.99,firstBaseline:8.31,maxLines:2},
+      // Office contacts begin under their headings at exactly the same height.
+      officeAddress:{x1:1.42,x2:3.20,firstBaseline:9.32,maxLines:3,lineHeight:.18},
+      officePhone:{x1:3.33,x2:4.72,firstBaseline:9.32,maxLines:2,lineHeight:.18},
+      officeWebsite:{x1:4.91,x2:7.22,firstBaseline:9.32,maxLines:2,lineHeight:.18}
     };
     function drawCoverValue(value,cell,{fontSize=12.2,minFontSize=9.4}={}){
       const raw=String(value||'').trim().replace(/\s*\n\s*/g,', ');
       if(!raw)return;
       const maxWidth=Math.max(.2,cell.x2-cell.x1-.07);
-      const lineHeight=.19;
+      const lineHeight=cell.lineHeight||.19;
       let size=fontSize,lines=[];
       // Every populated value uses the same bold, near-black text. Only the
       // point size can reduce to keep long values inside their existing cell.
@@ -3773,13 +3776,13 @@ async function exportPdf(options={}) {
         while(last.length>1&&doc.getTextWidth(last+'...')>maxWidth)last=last.slice(0,-1);
         lines[cell.maxLines-1]=last.trimEnd()+'...';
       }
-      const baseline=cell.cy-((lines.length-1)*lineHeight)/2+.035;
+      const baseline=cell.firstBaseline;
       setText([23,25,27]);
       doc.text(lines,cell.x1,baseline,{lineHeightFactor:lineHeight/(size/72),maxWidth});
     }
 
-    // Matching bold value hierarchy: primary fields 12.2pt, office contacts
-    // 10.5pt. Both are larger than before and keep the marketing layout fixed.
+    // Primary values retain 12.2pt; office contacts are now 11.5pt, top-aligned
+    // below the three locked marketing labels and resized only if needed.
     drawCoverValue(p.projectName||'Untitled Project',cells.project,{fontSize:12.2});
     drawCoverValue(fmtDate(p.proposalDate),cells.date,{fontSize:12.2});
     drawCoverValue(p.clientName||'',cells.client,{fontSize:12.2});
@@ -3787,9 +3790,9 @@ async function exportPdf(options={}) {
     drawCoverValue((p.attention||'').trim(),cells.attention,{fontSize:12.2});
     drawCoverValue(rev||'Original',cells.revision,{fontSize:12.2});
     drawCoverValue((p.preparedBy||'').trim(),cells.prepared,{fontSize:12.2});
-    drawCoverValue((coverOffice.address||'').trim(),cells.officeAddress,{fontSize:10.5,minFontSize:9});
-    drawCoverValue(livePhone,cells.officePhone,{fontSize:10.5,minFontSize:9});
-    drawCoverValue(website,cells.officeWebsite,{fontSize:10.5,minFontSize:9});
+    drawCoverValue((coverOffice.address||'').trim(),cells.officeAddress,{fontSize:11.5,minFontSize:9.3});
+    drawCoverValue(livePhone,cells.officePhone,{fontSize:11.5,minFontSize:9.3});
+    drawCoverValue(website,cells.officeWebsite,{fontSize:11.5,minFontSize:9.3});
   }
   function drawBackground(){
     if(interiorData)doc.addImage(interiorData,'PNG',0,0,pageW,pageH,undefined,'FAST');
