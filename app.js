@@ -3743,15 +3743,17 @@ async function exportPdf(options={}) {
     // marketing PDF and its artwork are never repositioned or recreated.
     const cells={
       project:{x1:1.26,x2:3.44,firstBaseline:4.91,maxLines:2},
+      // The three right-side values now share the printed headings' left edge.
       // Narrow right-column bounds protect the original photography wedge.
-      date:{x1:4.29,x2:5.90,firstBaseline:4.91,maxLines:1},
+      date:{x1:4.33,x2:5.90,firstBaseline:4.91,maxLines:1},
       client:{x1:1.26,x2:3.44,firstBaseline:6.01,maxLines:2},
-      projectAddress:{x1:4.29,x2:5.98,firstBaseline:6.01,maxLines:3},
+      projectAddress:{x1:4.33,x2:5.98,firstBaseline:6.01,maxLines:3},
       attention:{x1:1.26,x2:3.44,firstBaseline:7.15,maxLines:2},
-      revision:{x1:4.29,x2:6.20,firstBaseline:7.15,maxLines:1},
+      revision:{x1:4.33,x2:6.20,firstBaseline:7.15,maxLines:1},
       prepared:{x1:1.26,x2:6.99,firstBaseline:8.31,maxLines:2},
       // Office contacts begin under their headings at exactly the same height.
-      officeAddress:{x1:1.42,x2:3.20,firstBaseline:9.32,maxLines:3,lineHeight:.18},
+      // Office Address starts under ADDRESS, beside (not on) the locked logo.
+      officeAddress:{x1:1.13,x2:3.20,firstBaseline:9.32,maxLines:3,lineHeight:.18},
       officePhone:{x1:3.33,x2:4.72,firstBaseline:9.32,maxLines:2,lineHeight:.18},
       officeWebsite:{x1:4.91,x2:7.22,firstBaseline:9.32,maxLines:2,lineHeight:.18}
     };
