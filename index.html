@@ -295,7 +295,7 @@
             <label>Project Name<input data-field="projectName" placeholder="Project name" /></label>
             <label>Project Number<input data-field="projectNumber" placeholder="Optional project / estimate number" /></label>
             <label>Estimating Office<select data-field="estimatingOffice"><option value="fredonia">Fredonia</option><option value="tulsa">Tulsa</option></select></label>
-            <label>Proposal Type<select data-field="proposalType"><option value="standard">Standard Proposal</option><option value="civil">Civil Division Proposal</option><option value="concrete">Concrete Division Proposal</option><option value="self-perform">Self-Perform Proposal</option></select></label>
+            <label>Proposal Type<select data-field="proposalType"><option value="standard">General Contractor Proposal</option><option value="civil">Civil Division Proposal</option><option value="concrete">Concrete Division Proposal</option><option value="self-perform">Self-Perform Proposal</option></select></label>
             <label class="office-project-note">Office Contact<span>Selected office address and phone are used on the proposal cover.</span></label>
             <label>Client / Owner<input data-field="clientName" placeholder="Client or owner" /></label>
             <label>Attention<input data-field="attention" placeholder="Contact person" /></label>
@@ -506,7 +506,7 @@
       <label>Project Name<input id="newProjectName" required placeholder="Project name" /></label>
       <label>Client / Owner<input id="newClientName" placeholder="Client or owner" /></label>
       <label>Project Number<input id="newProjectNumber" placeholder="Optional" /></label>
-      <label>Proposal Type<select id="newProjectType" required><option value="standard">Standard Proposal</option><option value="civil">Civil Division Proposal</option><option value="concrete">Concrete Division Proposal</option><option value="self-perform">Self-Perform Proposal</option></select></label>
+      <label>Proposal Type<select id="newProjectType" required><option value="standard">General Contractor Proposal</option><option value="civil">Civil Division Proposal</option><option value="concrete">Concrete Division Proposal</option><option value="self-perform">Self-Perform Proposal</option></select></label>
       <label>Estimating Office<select id="newProjectOffice" required><option value="fredonia">Fredonia</option><option value="tulsa">Tulsa</option></select></label>
       <p id="newProjectOfficeNote" class="modal-helper">Office contact information will be used on the proposal cover.</p>
       <div class="modal-actions">
@@ -636,6 +636,8 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <!-- Exact 1-page marketing PDF cover composition; source artwork remains untouched. -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
     // Supabase's supported alternate CDN is a fallback when jsDelivr is
@@ -644,7 +646,7 @@
       document.write('<scr' + 'ipt src="https://unpkg.com/@supabase/supabase-js@2"></scr' + 'ipt>');
     }
   </script>
-  <script src="app.js?v=20261116-1"></script>
+  <script src="app.js?v=20261116-2"></script>
   <script src="proposal-alt-theme.js?v=20261102-4"></script>
 </body>
 </html>
