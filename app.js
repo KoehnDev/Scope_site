@@ -3738,24 +3738,32 @@ async function exportPdf(options={}) {
       doc.rect(1.20,4.72,2.08,.34,'F');
       doc.rect(4.30,4.72,1.63,.34,'F');
     }
-    // First-line baselines keep both single- and multi-line values aligned just
-    // below their printed headings. Changes affect only added text; the locked
-    // marketing PDF and its artwork are never repositioned or recreated.
+    // Align every added value to the printed headings, not to a generic grid.
+    // Each of the four locked marketing masters has slightly different label
+    // x-positions. The same .05 inch text inset applies across BOTH columns.
+    // The office address deliberately follows the left column's x-position
+    // so all left-column values align from Project through Office Address.
+    const headingXByTemplate={
+      standard:{left:1.21,right:4.32,phone:3.28,website:4.93},
+      civil:{left:1.23,right:4.31,phone:3.29,website:4.90},
+      concrete:{left:1.25,right:4.30,phone:3.29,website:4.89},
+      'self-perform':{left:1.28,right:4.26,phone:3.28,website:4.85}
+    };
+    const printedHeadingX=headingXByTemplate[proposalType];
+    const valueInset=.05;
+    const leftX=printedHeadingX.left+valueInset;
+    const rightX=printedHeadingX.right+valueInset;
     const cells={
-      project:{x1:1.26,x2:3.44,firstBaseline:4.91,maxLines:2},
-      // The three right-side values now share the printed headings' left edge.
-      // Narrow right-column bounds protect the original photography wedge.
-      date:{x1:4.33,x2:5.90,firstBaseline:4.91,maxLines:1},
-      client:{x1:1.26,x2:3.44,firstBaseline:6.01,maxLines:2},
-      projectAddress:{x1:4.33,x2:5.98,firstBaseline:6.01,maxLines:3},
-      attention:{x1:1.26,x2:3.44,firstBaseline:7.15,maxLines:2},
-      revision:{x1:4.33,x2:6.20,firstBaseline:7.15,maxLines:1},
-      prepared:{x1:1.26,x2:6.99,firstBaseline:8.31,maxLines:2},
-      // Office contacts begin under their headings at exactly the same height.
-      // Office Address starts under ADDRESS, beside (not on) the locked logo.
-      officeAddress:{x1:1.13,x2:3.20,firstBaseline:9.32,maxLines:3,lineHeight:.18},
-      officePhone:{x1:3.33,x2:4.72,firstBaseline:9.32,maxLines:2,lineHeight:.18},
-      officeWebsite:{x1:4.91,x2:7.22,firstBaseline:9.32,maxLines:2,lineHeight:.18}
+      project:{x1:leftX,x2:3.44,firstBaseline:4.91,maxLines:2},
+      date:{x1:rightX,x2:5.90,firstBaseline:4.91,maxLines:1},
+      client:{x1:leftX,x2:3.44,firstBaseline:6.01,maxLines:2},
+      projectAddress:{x1:rightX,x2:5.98,firstBaseline:6.01,maxLines:3},
+      attention:{x1:leftX,x2:3.44,firstBaseline:7.15,maxLines:2},
+      revision:{x1:rightX,x2:6.20,firstBaseline:7.15,maxLines:1},
+      prepared:{x1:leftX,x2:6.99,firstBaseline:8.31,maxLines:2},
+      officeAddress:{x1:leftX,x2:3.20,firstBaseline:9.32,maxLines:3,lineHeight:.18},
+      officePhone:{x1:printedHeadingX.phone+valueInset,x2:4.72,firstBaseline:9.32,maxLines:2,lineHeight:.18},
+      officeWebsite:{x1:printedHeadingX.website+valueInset,x2:7.22,firstBaseline:9.32,maxLines:2,lineHeight:.18}
     };
     function drawCoverValue(value,cell,{fontSize=12.2,minFontSize=9.4}={}){
       const raw=String(value||'').trim().replace(/\s*\n\s*/g,', ');
