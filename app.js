@@ -3743,7 +3743,7 @@ async function exportPdf(options={}) {
       officeWebsite:{x1:4.91,x2:7.22,cy:9.40,maxLines:2}
     };
     function drawCoverValue(value,cell,{fontSize=10.3,bold=true}={}){
-      const raw=String(value||'').trim().replace(/\\s*\\n\\s*/g,', ');
+      const raw=String(value||'').trim().replace(/\s*\n\s*/g,', ');
       if(!raw)return;
       const maxWidth=Math.max(.2,cell.x2-cell.x1-.07);
       const lineHeight=.176;
