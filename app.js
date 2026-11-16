@@ -717,7 +717,7 @@ function normalizeProject(p, ownerUsername="") {
     }
   });
   p.company = {...DEFAULT_COMPANY, ...(p.company||{})};
-  if(!["standard","civil","concrete"].includes(p.proposalType)) p.proposalType="standard";
+  if(!["standard","civil","concrete","self-perform"].includes(p.proposalType)) p.proposalType="standard";
   if(!["fredonia","tulsa"].includes(p.estimatingOffice)) p.estimatingOffice="fredonia";
   const officeDefaults=getOfficeContact(p.estimatingOffice);
   p.officeContact={...officeDefaults,...(p.officeContact||{}),id:p.estimatingOffice,name:officeDefaults.name};
@@ -3678,8 +3678,9 @@ async function exportPdf(options={}) {
   if(!previewOnly)setSaveStatus("Building PDF…");
   const {jsPDF}=window.jspdf;
   const pageW=8.5,pageH=11;
-  const proposalType=["civil","concrete"].includes(p.proposalType)?p.proposalType:"standard";
-  const coverPageH=proposalType==="standard"?11.333333:11;
+  const proposalType=["standard","civil","concrete","self-perform"].includes(p.proposalType)?p.proposalType:"standard";
+  // All four approved proposal cover templates are US Letter sized.
+  const coverPageH=11;
   const doc=new jsPDF({unit:"in",format:[pageW,coverPageH],orientation:"portrait",compress:!fastPreview});
   // Proposal heading triangles, bullets and dividers always use Koehn orange.
   // Some legacy project records inherited a black company accent in revisions.
@@ -3689,18 +3690,27 @@ async function exportPdf(options={}) {
   const topY=1.20, bottomLimit=.72, cardGap=.14;
   const bodyFont=12.0, bodyLeading=.215, minPdfFont=12.0;
   let coverRevisionData=null,coverOriginalData=null,interiorData=null;
-  const coverPaths=proposalType==='civil'
-    ? ['assets/marketing/civil/cover-revision.png','assets/marketing/civil/cover-original.png']
-    : proposalType==='concrete'
-      ? ['assets/marketing/concrete/cover-revision.png','assets/marketing/concrete/cover-original.png']
-      : ['assets/marketing/marketing-cover-revision.png','assets/marketing/marketing-cover-original.png'];
-  try {
-    [coverRevisionData,coverOriginalData,interiorData]=await Promise.all([
-      imageToDataUrl(coverPaths[0]),
-      imageToDataUrl(coverPaths[1]),
+  // Cover art is from the marketing-approved 2026 GC, Civil, Concrete, and
+  // Self-Perform templates. Revisions share the exact same cover design;
+  // the Revision field on the template displays V1/V2/etc.
+  // Interior proposal pages deliberately retain their existing background.
+  const coverArt={
+    standard:'assets/marketing/new-covers/gc.webp?v=20261116-1',
+    civil:'assets/marketing/new-covers/civil.webp?v=20261116-1',
+    concrete:'assets/marketing/new-covers/concrete.webp?v=20261116-1',
+    'self-perform':'assets/marketing/new-covers/sp.webp?v=20261116-1'
+  };
+  try{
+    [coverOriginalData,interiorData]=await Promise.all([
+      imageToDataUrl(coverArt[proposalType]),
       imageToDataUrl('assets/marketing/marketing-blank.png')
     ]);
-  } catch {}
+    coverRevisionData=coverOriginalData;
+  }catch(err){
+    console.error('Approved proposal cover failed to load.',err);
+    if(!previewOnly)toast('Proposal cover template could not load. Refresh the page and try again.');
+    return null;
+  }
   if(!await uiYield())return null;
   const rgb=(arr)=>arr;
   const fmtProjectNo=()=>String(p.projectNumber||"PROJECT").toUpperCase();
@@ -3710,57 +3720,62 @@ async function exportPdf(options={}) {
   function coverMask(x,y,w,h,color=[255,255,255]){doc.setFillColor(...color);doc.rect(x,y,w,h,'F');}
   function drawCover(){
     const coverData=rev?coverRevisionData:coverOriginalData;
-    if(coverData) doc.addImage(coverData,'PNG',0,0,pageW,coverPageH,undefined,'FAST');
-    else { setFill([255,255,255]);doc.rect(0,0,pageW,pageH,'F'); }
-    const coverOffice={...getOfficeContact(p.estimatingOffice||"fredonia"),...(p.officeContact||{})};
-    const livePhone=coverOffice.phone||"";
-    const website=p.company.website||DEFAULT_COMPANY.website||"";
-    const standardFields={
-      project:{x1:1.10,x2:3.42,cy:5.88},
-      date:{x1:4.10,x2:5.82,cy:5.88},
-      client:{x1:1.10,x2:3.42,cy:7.03},
-      prepared:{x1:4.10,x2:5.82,cy:7.03},
-      attn:{x1:1.10,x2:3.42,cy:8.17},
-      revision:{x1:4.10,x2:5.82,cy:8.17},
-      address:{x1:1.10,x2:3.58,cy:9.18},
-      phone:{x1:1.10,x2:3.42,cy:10.12},
-      website:{x1:4.10,x2:5.82,cy:10.12}
+    if(coverData)doc.addImage(coverData,'PNG',0,0,pageW,coverPageH,undefined,'FAST');
+    else{setFill([255,255,255]);doc.rect(0,0,pageW,coverPageH,'F');}
+
+    const coverOffice={...getOfficeContact(p.estimatingOffice||'fredonia'),...(p.officeContact||{})};
+    const livePhone=coverOffice.phone||'';
+    const website=p.company.website||DEFAULT_COMPANY.website||'';
+    // Positions are based on the actual lettering and divider guides on the
+    // four marketing-approved US Letter PDF templates. Text begins BELOW each
+    // heading, never over the preprinted icons, labels, or horizontal rules.
+    // Every value is fitted inside its own grid cell.
+    const cells={
+      project:{x1:1.26,x2:3.75,cy:4.99,maxLines:2},
+      date:{x1:4.29,x2:7.22,cy:4.99,maxLines:1},
+      client:{x1:1.26,x2:3.75,cy:6.13,maxLines:2},
+      projectAddress:{x1:4.29,x2:7.22,cy:6.13,maxLines:2},
+      attention:{x1:1.26,x2:3.75,cy:7.28,maxLines:2},
+      revision:{x1:4.29,x2:7.22,cy:7.28,maxLines:1},
+      prepared:{x1:1.26,x2:6.99,cy:8.42,maxLines:2},
+      officeAddress:{x1:1.42,x2:3.20,cy:9.40,maxLines:2},
+      officePhone:{x1:3.33,x2:4.72,cy:9.40,maxLines:2},
+      officeWebsite:{x1:4.91,x2:7.22,cy:9.40,maxLines:2}
     };
-    // Civil and Concrete keep their own vertical row positions, but now use the
-    // same left/right column text flow as the Standard proposal cover.
-    const divisionFields={
-      project:{x1:1.10,x2:3.42,cy:5.48},
-      date:{x1:4.10,x2:5.82,cy:5.48},
-      client:{x1:1.10,x2:3.42,cy:6.67},
-      prepared:{x1:4.10,x2:5.82,cy:6.67},
-      attn:{x1:1.10,x2:3.42,cy:7.95},
-      revision:{x1:4.10,x2:5.82,cy:7.95},
-      address:{x1:1.10,x2:3.58,cy:8.99},
-      phone:{x1:1.10,x2:3.42,cy:9.79},
-      website:{x1:4.10,x2:5.82,cy:9.79}
-    };
-    const fields=proposalType==='standard'?standardFields:divisionFields;
-    const drawCentered=(value,box,{bold=true,fontSize=12.0,maxLines=2,align='center'}={})=>{
-      const textValue=String(value||"").trim();if(!textValue)return;
-      doc.setFont('helvetica',bold?'bold':'normal');doc.setFontSize(Math.max(minPdfFont,fontSize));setText(text);
-      const width=Math.max(.25,box.x2-box.x1-.08);
-      let lines=doc.splitTextToSize(textValue,width);
-      if(lines.length>maxLines)lines=lines.slice(0,maxLines);
-      const leading=.185;
-      const startY=box.cy-((lines.length-1)*leading)/2+.055;
-      const x=align==='left'?box.x1:(box.x1+box.x2)/2;
-      doc.text(lines,x,startY,{align,lineHeightFactor:leading/(Math.max(minPdfFont,fontSize)/72)});
-    };
-    const coverAlign='left';
-    drawCentered(p.projectName||'Untitled Project',fields.project,{fontSize:12.5,maxLines:2,align:coverAlign});
-    drawCentered(fmtDate(p.proposalDate),fields.date,{fontSize:12.0,maxLines:1,align:coverAlign});
-    drawCentered(p.clientName||'—',fields.client,{fontSize:12.0,maxLines:2,align:coverAlign});
-    drawCentered(p.preparedBy||'—',fields.prepared,{fontSize:12.0,maxLines:2,align:coverAlign});
-    drawCentered((p.attention||'').trim(),fields.attn,{fontSize:12.0,maxLines:2,align:coverAlign});
-    if(rev)drawCentered(rev,fields.revision,{fontSize:12.0,maxLines:1,align:coverAlign});
-    drawCentered((coverOffice.address||'').replace(/\n/g,', '),fields.address,{bold:false,fontSize:12.0,maxLines:3,align:coverAlign});
-    drawCentered(livePhone,fields.phone,{bold:false,fontSize:12.0,maxLines:1,align:coverAlign});
-    drawCentered(website,fields.website,{bold:false,fontSize:12.0,maxLines:1,align:coverAlign});
+    function drawCoverValue(value,cell,{fontSize=10.3,bold=true}={}){
+      const raw=String(value||'').trim().replace(/\\s*\\n\\s*/g,', ');
+      if(!raw)return;
+      const maxWidth=Math.max(.2,cell.x2-cell.x1-.07);
+      const lineHeight=.176;
+      let size=fontSize,lines=[];
+      for(;;){
+        doc.setFont('helvetica',bold?'bold':'normal');
+        doc.setFontSize(size);
+        lines=doc.splitTextToSize(raw,maxWidth);
+        if(lines.length<=cell.maxLines||size<=8.2)break;
+        size-=.4;
+      }
+      if(lines.length>cell.maxLines){
+        lines=lines.slice(0,cell.maxLines);
+        let last=lines[cell.maxLines-1].trim();
+        while(last.length>1&&doc.getTextWidth(last+'...')>maxWidth)last=last.slice(0,-1);
+        lines[cell.maxLines-1]=last.trimEnd()+'...';
+      }
+      const baseline=cell.cy-((lines.length-1)*lineHeight)/2+.035;
+      setText([36,39,42]);
+      doc.text(lines,cell.x1,baseline,{lineHeightFactor:lineHeight/(size/72),maxWidth});
+    }
+
+    drawCoverValue(p.projectName||'Untitled Project',cells.project,{fontSize:10.8});
+    drawCoverValue(fmtDate(p.proposalDate),cells.date,{fontSize:10.5});
+    drawCoverValue(p.clientName||'',cells.client,{fontSize:10.5});
+    drawCoverValue((p.projectAddress||'').trim(),cells.projectAddress,{fontSize:10.0,bold:false});
+    drawCoverValue((p.attention||'').trim(),cells.attention,{fontSize:10.5});
+    drawCoverValue(rev||'Original',cells.revision,{fontSize:10.5});
+    drawCoverValue((p.preparedBy||'').trim(),cells.prepared,{fontSize:10.5});
+    drawCoverValue((coverOffice.address||'').trim(),cells.officeAddress,{fontSize:8.8,bold:false});
+    drawCoverValue(livePhone,cells.officePhone,{fontSize:9.1,bold:false});
+    drawCoverValue(website,cells.officeWebsite,{fontSize:9.1,bold:false});
   }
   function drawBackground(){
     if(interiorData)doc.addImage(interiorData,'PNG',0,0,pageW,pageH,undefined,'FAST');
