@@ -3736,16 +3736,16 @@ async function exportPdf(options={}) {
     if(proposalType==='standard'){
       setFill([252,252,252]);
       doc.rect(1.20,4.72,2.08,.34,'F');
-      doc.rect(4.315,4.72,1.57,.34,'F');
+      doc.rect(4.30,4.72,1.63,.34,'F');
     }
     const cells={
-      project:{x1:1.26,x2:3.75,cy:4.99,maxLines:2},
+      project:{x1:1.26,x2:3.44,cy:4.99,maxLines:2},
       // These narrower right-column cells stop before the original
       // photography wedge. No marketing artwork is altered or masked.
       date:{x1:4.29,x2:5.90,cy:4.99,maxLines:1},
-      client:{x1:1.26,x2:3.75,cy:6.13,maxLines:2},
+      client:{x1:1.26,x2:3.44,cy:6.13,maxLines:2},
       projectAddress:{x1:4.29,x2:5.98,cy:6.13,maxLines:3},
-      attention:{x1:1.26,x2:3.75,cy:7.28,maxLines:2},
+      attention:{x1:1.26,x2:3.44,cy:7.28,maxLines:2},
       revision:{x1:4.29,x2:6.20,cy:7.28,maxLines:1},
       prepared:{x1:1.26,x2:6.99,cy:8.42,maxLines:2},
       officeAddress:{x1:1.42,x2:3.20,cy:9.40,maxLines:3},
